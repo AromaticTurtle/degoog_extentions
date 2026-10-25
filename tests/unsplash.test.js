@@ -215,11 +215,39 @@ describe("UnsplashEngine", () => {
     expect(new URL(ctx.calls[1].url).origin).toBe("https://web.test");
   });
 
-  test("a web page instead of JSON is an interstitial error", async () => {
+  test("a web page instead of JSON is an interstitial error, and the website is then left alone", async () => {
     await withEnv("UNSPLASH_ACCESS_KEY", undefined, async () => {
       const ctx = makeContext(() => new Response("<html>checking your browser</html>", { status: 200 }));
-      await expect(make({}).executeSearch("lake", 1, "any", ctx)).rejects.toMatchObject({ status: "interstitial" });
+      const engine = make({});
+      await expect(engine.executeSearch("lake", 1, "any", ctx)).rejects.toMatchObject({ status: "interstitial" });
+      await expect(engine.executeSearch("lake", 1, "any", ctx)).rejects.toMatchObject({ status: "rate_limited" });
+      expect(ctx.calls).toHaveLength(1);
     });
+  });
+
+  test("a bot check refused by degoog (Anubis too hard) pauses the website for half an hour", async () => {
+    await withEnv("UNSPLASH_ACCESS_KEY", undefined, async () => {
+      const calls = [];
+      const ctx = makeContext(ok, {
+        fetch: async (url) => {
+          calls.push(url);
+          throw breach("interstitial", "Unsplash raised its Anubis difficulty to 5, above the limit of 4");
+        },
+      });
+      const engine = make({});
+      await expect(engine.executeSearch("lake", 1, "any", ctx)).rejects.toMatchObject({ status: "interstitial" });
+      expect(engine.webLimiter.blockedFor()).toBeGreaterThan(29 * 60 * 1000);
+      await expect(engine.executeSearch("lake", 1, "any", ctx)).rejects.toMatchObject({ status: "rate_limited" });
+      expect(calls).toHaveLength(1);
+    });
+  });
+
+  test("with a key, a blocked website still lets the API work once its pause ends", async () => {
+    const ctx = makeContext(queue(status(429), status(403)));
+    const engine = make();
+    await expect(engine.executeSearch("lake", 1, "any", ctx)).rejects.toThrow();
+    expect(engine.apiLimiter.blockedFor()).toBeGreaterThan(0);
+    expect(engine.webLimiter.blockedFor()).toBeGreaterThan(0);
   });
 
   test("a blocked website pauses further website requests", async () => {

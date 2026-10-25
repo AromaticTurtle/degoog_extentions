@@ -14,7 +14,7 @@ export const SETTINGS_SCHEMA = [
     type: "toggle",
     default: "true",
     description:
-      "Without a key, or once the hourly API quota is used up, search through the website's own JSON endpoint. That endpoint is undocumented and can change or be blocked at any time. Turn this off to use the official API only.",
+      "Without a key, or once the hourly API quota is used up, search through the website's own JSON endpoint. That endpoint is undocumented, can change or be blocked at any time, and is currently behind a bot check that degoog may refuse to solve (see the README). A free API key is the reliable option. Turn this off to use the official API only.",
   },
   {
     key: "perPage",

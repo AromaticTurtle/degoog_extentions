@@ -8,6 +8,8 @@ export { filters } from "./request.js";
 export const type = "images";
 
 const QUOTA_PAUSE_MS = 10 * 60 * 1000;
+const WEB_BLOCK_PAUSE_MS = 30 * 60 * 1000;
+const BLOCK_STATUSES = new Set(["interstitial", "captcha", "blocked", "rate_limited"]);
 
 const sharedApiLimiter = new Limiter({ minIntervalMs: 1000, maxWaitMs: 5000 });
 const sharedWebLimiter = new Limiter({ minIntervalMs: 2000, maxWaitMs: 5000 });
@@ -94,7 +96,7 @@ export default class UnsplashEngine {
       throw this._error(
         context,
         "rate_limited",
-        `${this.name} website is rate limiting this instance, paused for ${Math.ceil(paused / 1000)}s`,
+        `${this.name} website paused after a block or bot check, trying again in ${Math.ceil(paused / 60000)} min`,
       );
     }
     if (!(await this.webLimiter.acquire())) {
@@ -102,14 +104,27 @@ export default class UnsplashEngine {
     }
     const url = buildWebUrl(text, page, { perPage: this.perPage, imageFilter: context?.imageFilter }, this.webBase);
     const doFetch = context?.fetch ?? fetch;
-    const response = await doFetch(url, { headers: buildWebHeaders() });
+    let response;
+    try {
+      response = await doFetch(url, { headers: buildWebHeaders() });
+    } catch (error) {
+      if (error?.name === "SentinelBreach" && BLOCK_STATUSES.has(error.status)) {
+        this.webLimiter.penalize(WEB_BLOCK_PAUSE_MS);
+      }
+      throw error;
+    }
 
     if ([403, 429, 503].includes(response.status)) {
       this.webLimiter.penalize(retryAfterMs(response.headers?.get?.("retry-after"), QUOTA_PAUSE_MS, QUOTA_PAUSE_MS));
     }
     if (context?.sentinel) context.sentinel(response, this.name);
     else if (!response.ok) throw this._error(context, "network", `${this.name} answered HTTP ${response.status}`);
-    return this._parse(await this._readJson(response, context), context);
+    try {
+      return this._parse(await this._readJson(response, context), context);
+    } catch (error) {
+      if (error?.status === "interstitial") this.webLimiter.penalize(WEB_BLOCK_PAUSE_MS);
+      throw error;
+    }
   }
 
   async executeSearch(query, page = 1, _timeFilter, context) {
