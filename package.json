@@ -10,6 +10,20 @@
       "description": "Marginalia Search (small, non-commercial web) through its API. Needs a free API key. One request per page, spaced out, with a cool-down after rate limiting.",
       "version": "1.0.0",
       "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "engines/openalex",
+      "name": "OpenAlex",
+      "description": "Scholarly works from OpenAlex on a Scholar tab. Works without a key; a free key raises the daily budget. Stops when the daily budget is spent.",
+      "version": "1.0.0",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "engines/core",
+      "name": "CORE",
+      "description": "Open access research papers from CORE on a Scholar tab. Needs a free API key. Paced to CORE's small quota.",
+      "version": "1.0.0",
+      "minDegoogVersion": "1.1.0"
     }
   ]
 }

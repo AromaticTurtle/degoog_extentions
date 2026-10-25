@@ -1,0 +1,35 @@
+{
+  "totalHits": 4,
+  "limit": 10,
+  "offset": 0,
+  "results": [
+    {
+      "id": 123456,
+      "doi": "10.1234/ABC.5",
+      "title": "A <b>CORE</b> paper",
+      "abstract": "An abstract\nwith  spacing &amp; entities.",
+      "authors": [{ "name": "Ada Lovelace" }, { "name": "Alan Turing" }],
+      "journals": [{ "title": "Journal of Tests" }],
+      "yearPublished": 2019,
+      "publishedDate": "2019-06-01T00:00:00",
+      "citationCount": 5,
+      "downloadUrl": "https://example.org/paper.pdf",
+      "fullText": "This field is huge in real responses and must never be read."
+    },
+    {
+      "id": "789",
+      "title": "No DOI paper",
+      "authors": [],
+      "yearPublished": 2021
+    },
+    {
+      "id": "x",
+      "title": "No usable URL"
+    },
+    {
+      "id": 999,
+      "doi": "https://doi.org/10.1234/abc.5",
+      "title": "Duplicate of the first by DOI"
+    }
+  ]
+}

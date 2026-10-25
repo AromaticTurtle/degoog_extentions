@@ -1,0 +1,54 @@
+{
+  "meta": { "count": 5, "page": 1, "per_page": 10 },
+  "results": [
+    {
+      "id": "https://openalex.org/W1",
+      "doi": "https://doi.org/10.1038/NATURE14539",
+      "title": "Deep learning",
+      "display_name": "Deep learning",
+      "publication_year": 2015,
+      "publication_date": "2015-05-28",
+      "cited_by_count": 60000,
+      "authorships": [
+        { "author": { "display_name": "Yann LeCun" } },
+        { "author": { "display_name": "Yoshua Bengio" } },
+        { "author": { "display_name": "Geoffrey Hinton" } },
+        { "author": { "display_name": "Fourth Author" } }
+      ],
+      "primary_location": {
+        "landing_page_url": "https://www.nature.com/articles/nature14539",
+        "source": { "display_name": "Nature" }
+      },
+      "open_access": { "is_oa": true, "oa_url": "https://example.org/dl.pdf" },
+      "abstract_inverted_index": { "Deep": [0], "learning": [1], "allows": [2], "R&amp;D": [3] }
+    },
+    {
+      "id": "https://openalex.org/W2",
+      "doi": null,
+      "title": null,
+      "display_name": "Fallback title",
+      "publication_year": 2020,
+      "publication_date": "2020-03",
+      "cited_by_count": 1,
+      "authorships": [],
+      "primary_location": null,
+      "open_access": { "is_oa": false, "oa_url": null },
+      "abstract_inverted_index": null
+    },
+    {
+      "id": "https://openalex.org/W3",
+      "doi": "10.1038/nature14539",
+      "title": "Duplicate of the first by DOI",
+      "publication_year": 2015
+    },
+    {
+      "id": "https://openalex.org/W4",
+      "title": "",
+      "display_name": ""
+    },
+    {
+      "id": "not-a-url",
+      "title": "Has no usable link"
+    }
+  ]
+}
