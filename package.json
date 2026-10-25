@@ -24,6 +24,13 @@
       "description": "Open access research papers from CORE on a Scholar tab. Needs a free API key. Paced to CORE's small quota.",
       "version": "1.0.0",
       "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "engines/unsplash",
+      "name": "Unsplash",
+      "description": "Unsplash photos on the Images tab. Uses the official API with a key, and falls back to the website when there is no key or the quota is spent. Credits the photographer.",
+      "version": "1.0.0",
+      "minDegoogVersion": "1.1.0"
     }
   ]
 }
