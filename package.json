@@ -28,8 +28,8 @@
     {
       "path": "engines/unsplash",
       "name": "Unsplash",
-      "description": "Unsplash photos on the Images tab. Uses the official API with a key, and falls back to the website when there is no key or the quota is spent. Credits the photographer.",
-      "version": "1.0.1",
+      "description": "Unsplash photos on the Images tab through the official API. Needs a free API key. Credits the photographer with their profile address.",
+      "version": "1.1.0",
       "minDegoogVersion": "1.1.0"
     }
   ]

@@ -1,5 +1,4 @@
 export const API_BASE = "https://api.unsplash.com";
-export const WEB_BASE = "https://unsplash.com";
 
 export const filters = {
   layout: ["square", "wide", "tall"],
@@ -23,7 +22,7 @@ const COLOR = {
 
 const MAX_QUERY_CHARS = 500;
 
-const searchParams = (query, page, options) => {
+export const buildApiUrl = (query, page, options, base = API_BASE) => {
   const params = new URLSearchParams({
     query: query.slice(0, MAX_QUERY_CHARS),
     per_page: String(options.perPage),
@@ -33,25 +32,12 @@ const searchParams = (query, page, options) => {
   if (ORIENTATION[imageFilter.layout]) params.set("orientation", ORIENTATION[imageFilter.layout]);
   if (COLOR[imageFilter.color]) params.set("color", COLOR[imageFilter.color]);
   if (imageFilter.nsfw === "on") params.set("content_filter", "high");
-  return params;
+  return `${base.replace(/\/+$/, "")}/search/photos?${params}`;
 };
-
-export const buildApiUrl = (query, page, options, base = API_BASE) =>
-  `${base.replace(/\/+$/, "")}/search/photos?${searchParams(query, page, options)}`;
-
-export const buildWebUrl = (query, page, options, base = WEB_BASE) =>
-  `${base.replace(/\/+$/, "")}/napi/search/photos?${searchParams(query, page, options)}`;
-
-const USER_AGENT = "degoog-unsplash-engine/1.0 (+https://github.com/AromaticTurtle/degoog_extentions)";
 
 export const buildApiHeaders = (accessKey) => ({
   Accept: "application/json",
   "Accept-Version": "v1",
   Authorization: `Client-ID ${accessKey}`,
-  "User-Agent": USER_AGENT,
-});
-
-export const buildWebHeaders = () => ({
-  Accept: "application/json",
-  "User-Agent": USER_AGENT,
+  "User-Agent": "degoog-unsplash-engine/1.1 (+https://github.com/AromaticTurtle/degoog_extentions)",
 });

@@ -6,7 +6,11 @@
       "id": "a1",
       "description": "A quiet lake at dawn",
       "alt_description": "body of water near mountains",
-      "user": { "name": "Jane Doe", "username": "janedoe" },
+      "user": {
+        "name": "Jane Doe",
+        "username": "janedoe",
+        "links": { "html": "https://unsplash.com/@janedoe" }
+      },
       "urls": {
         "thumb": "https://images.unsplash.com/photo-1?ixid=AAA&w=200",
         "small": "https://images.unsplash.com/photo-1?ixid=AAA&w=400",
@@ -18,7 +22,7 @@
       "id": "b2",
       "description": null,
       "alt_description": null,
-      "user": { "name": "Joe" },
+      "user": { "name": "Joe", "username": "joe" },
       "urls": {
         "small": "http://images.unsplash.com/photo-2?w=400",
         "full": "https://images.unsplash.com/photo-2?q=75&fm=jpg"
