@@ -1,0 +1,11 @@
+{
+  "query": "linear b",
+  "license": "CC-BY-NC-SA 4.0",
+  "results": [
+    { "url": "https://example.org/linear-b", "title": "Linear B &amp; Mycenaean Greek", "description": "An  overview of the\n script &#039;Linear B&#039;." },
+    { "url": "https://example.org/linear-b", "title": "Duplicate of the first", "description": "dropped" },
+    { "url": "ftp://example.org/x", "title": "Not http", "description": "dropped" },
+    { "url": "https://example.net/a", "title": "", "description": "dropped: no title" },
+    { "url": "https://example.net/b", "title": "Plain result", "description": "Plain snippet." }
+  ]
+}
