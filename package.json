@@ -3,6 +3,16 @@
   "description": "Personal degoog extensions: engines, plugins and tools.",
   "author": "AromaticTurtle",
   "license": "MIT",
+  "plugins": [
+    {
+      "path": "plugins/rawg",
+      "name": "RAWG video games",
+      "description": "Video game information panel in the side column (cover, Metacritic, rating, platforms, developer, description) from RAWG. Needs a free RAWG API key. Cached, and capped to a monthly request limit.",
+      "version": "1.0.0",
+      "type": "slot",
+      "minDegoogVersion": "1.1.0"
+    }
+  ],
   "engines": [
     {
       "path": "engines/marginalia",

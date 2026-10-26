@@ -1,0 +1,16 @@
+{
+  "_note": "Hand-written to match the field layout in RAWG's API documentation (GET /games/{id}). Replace with a real excerpt by running tests/record-rawg-fixtures.js.",
+  "id": 326243,
+  "slug": "elden-ring",
+  "name": "Elden Ring",
+  "released": "2022-02-25",
+  "background_image": "https://media.rawg.io/media/games/b29/b294fdd866dcdb643e7bab370a552855.jpg",
+  "metacritic": 96,
+  "playtime": 56,
+  "website": "https://www.eldenring.example/",
+  "reddit_url": "https://www.reddit.com/r/Eldenring/",
+  "description_raw": "A sprawling open-world action role-playing game. Travel across a vast land, fight enormous bosses and piece together a story told through item descriptions and chance meetings.\n\nSummon allies, ride a spectral steed and choose from many weapons, spells and builds.\n\nThis paragraph exists so the description is long enough to be split into a preview and a read-more part, which the panel does after about three hundred characters of text.\nEspañol\nUn amplio juego de rol de acción de mundo abierto.",
+  "developers": [{ "id": 1, "name": "FromSoftware", "slug": "fromsoftware" }],
+  "publishers": [{ "id": 2, "name": "Bandai Namco Entertainment", "slug": "bandai-namco-entertainment" }],
+  "esrb_rating": { "id": 4, "name": "Mature", "slug": "mature" }
+}

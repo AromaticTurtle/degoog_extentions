@@ -1,0 +1,74 @@
+{
+  "_note": "Hand-written to match the field layout in RAWG's API documentation (GET /games). Replace with a real excerpt by running tests/record-rawg-fixtures.js.",
+  "count": 3,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 326243,
+      "slug": "elden-ring",
+      "name": "Elden Ring",
+      "released": "2022-02-25",
+      "tba": false,
+      "background_image": "https://media.rawg.io/media/games/b29/b294fdd866dcdb643e7bab370a552855.jpg",
+      "rating": 4.38,
+      "rating_top": 5,
+      "ratings_count": 5200,
+      "metacritic": 96,
+      "playtime": 56,
+      "added": 15800,
+      "platforms": [
+        { "platform": { "id": 4, "name": "PC", "slug": "pc" } },
+        { "platform": { "id": 187, "name": "PlayStation 5", "slug": "playstation5" } },
+        { "platform": { "id": 1, "name": "Xbox One", "slug": "xbox-one" } }
+      ],
+      "parent_platforms": [
+        { "platform": { "id": 1, "name": "PC", "slug": "pc" } },
+        { "platform": { "id": 2, "name": "PlayStation", "slug": "playstation" } },
+        { "platform": { "id": 3, "name": "Xbox", "slug": "xbox" } }
+      ],
+      "genres": [
+        { "id": 4, "name": "Action", "slug": "action" },
+        { "id": 5, "name": "RPG", "slug": "role-playing-games-rpg" }
+      ],
+      "stores": [
+        { "store": { "id": 1, "name": "Steam", "slug": "steam", "domain": "store.steampowered.com" } },
+        { "store": { "id": 3, "name": "PlayStation Store", "slug": "playstation-store", "domain": "store.playstation.com" } }
+      ],
+      "esrb_rating": { "id": 4, "name": "Mature", "slug": "mature" }
+    },
+    {
+      "id": 999001,
+      "slug": "elden-ring-shadow-of-the-erdtree",
+      "name": "Elden Ring: Shadow of the Erdtree",
+      "released": "2024-06-21",
+      "tba": false,
+      "background_image": "https://media.rawg.io/media/games/f2e/f2e7bd1d5c7f0f6b3c6d1f2c2f8a1a77.jpg",
+      "rating": 4.2,
+      "ratings_count": 400,
+      "metacritic": 94,
+      "playtime": 20,
+      "added": 4100,
+      "parent_platforms": [{ "platform": { "id": 1, "name": "PC", "slug": "pc" } }],
+      "genres": [{ "id": 4, "name": "Action", "slug": "action" }],
+      "stores": [],
+      "esrb_rating": { "id": 4, "name": "Mature", "slug": "mature" }
+    },
+    {
+      "id": 999002,
+      "slug": "elden-ring-demake",
+      "name": "Elden Ring Demake",
+      "released": null,
+      "background_image": null,
+      "rating": 0,
+      "ratings_count": 0,
+      "metacritic": null,
+      "playtime": 0,
+      "added": 3,
+      "parent_platforms": [],
+      "genres": [],
+      "stores": [],
+      "esrb_rating": null
+    }
+  ]
+}
