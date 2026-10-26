@@ -1,0 +1,50 @@
+export const SETTINGS_SCHEMA = [
+  {
+    key: "clientId",
+    label: "Twitch client ID",
+    type: "text",
+    placeholder: "From dev.twitch.tv/console",
+    description:
+      "IGDB is run by Twitch, so it needs a free Twitch developer app. Go to https://dev.twitch.tv/console and register an application (your Twitch account needs two-factor authentication): any name, OAuth redirect URL http://localhost, category Other, client type Confidential. Then copy the Client ID here. IGDB_CLIENT_ID in the container environment is used when this is empty.",
+  },
+  {
+    key: "clientSecret",
+    label: "Twitch client secret",
+    type: "password",
+    secret: true,
+    placeholder: "Press New Secret on the app page",
+    description:
+      "On the same application page press New Secret and paste it here. Saved on the server only, never shown in a page or written to a log. IGDB_CLIENT_SECRET in the container environment is used when this is empty.",
+  },
+  {
+    key: "requireGameWord",
+    label: "Only for queries that sound like games",
+    type: "toggle",
+    default: "false",
+    description:
+      "Off: any short query is checked against IGDB and the panel appears only for a confident title match (for example 'skyrim'). On: the query must also contain a game word (game, steam, ps5, xbox, walkthrough...). On costs fewer requests.",
+  },
+  {
+    key: "showProtonDb",
+    label: "Show ProtonDB compatibility",
+    type: "toggle",
+    default: "true",
+    description:
+      "Adds the Linux / Steam Deck compatibility tier from ProtonDB (one extra request per new game with a Steam page, cached for a day). ProtonDB has no official API, so this may stop working one day. Off makes no ProtonDB requests at all.",
+  },
+  {
+    key: "steamFallback",
+    label: "Look up the Steam page when IGDB has none",
+    type: "toggle",
+    default: "true",
+    description:
+      "When IGDB does not list a Steam page for a PC game, search the Steam store for a game with exactly the same name (one request, cached for a week). Off makes no Steam requests; the Steam link then only appears when IGDB knows it.",
+  },
+  {
+    key: "showDescription",
+    label: "Show a short description",
+    type: "toggle",
+    default: "true",
+    description: "Shows the first few sentences of IGDB's summary under the title.",
+  },
+];

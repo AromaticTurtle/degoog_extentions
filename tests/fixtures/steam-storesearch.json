@@ -1,0 +1,77 @@
+{
+  "total": 7,
+  "items": [
+    {
+      "type": "app",
+      "name": "The Elder Scrolls V: Skyrim Special Edition",
+      "id": 489830,
+      "price": {
+        "currency": "USD",
+        "initial": 3999,
+        "final": 3999
+      },
+      "tiny_image": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/489830/capsule_231x87.jpg",
+      "metascore": "74",
+      "platforms": {
+        "windows": true,
+        "mac": false,
+        "linux": false
+      },
+      "streamingvideo": false
+    },
+    {
+      "type": "app",
+      "name": "The Elder Scrolls V: Skyrim VR",
+      "id": 611670,
+      "price": {
+        "currency": "USD",
+        "initial": 3999,
+        "final": 3999
+      },
+      "tiny_image": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/611670/capsule_231x87.jpg",
+      "metascore": "",
+      "platforms": {
+        "windows": true,
+        "mac": false,
+        "linux": false
+      },
+      "streamingvideo": false
+    },
+    {
+      "type": "app",
+      "name": "The Elder Scrolls V: Skyrim",
+      "id": 72850,
+      "price": {
+        "currency": "USD",
+        "initial": 1999,
+        "final": 1999
+      },
+      "tiny_image": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/72850/capsule_231x87.jpg",
+      "metascore": "",
+      "platforms": {
+        "windows": true,
+        "mac": false,
+        "linux": false
+      },
+      "streamingvideo": false
+    },
+    {
+      "type": "app",
+      "name": "Skyrim Soundtrack Bundle",
+      "id": 1234501,
+      "price": {
+        "currency": "USD",
+        "initial": 999,
+        "final": 999
+      },
+      "tiny_image": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1234501/capsule_231x87.jpg",
+      "metascore": "",
+      "platforms": {
+        "windows": true,
+        "mac": false,
+        "linux": false
+      },
+      "streamingvideo": false
+    }
+  ]
+}

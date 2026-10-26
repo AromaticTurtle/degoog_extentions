@@ -1,0 +1,383 @@
+[
+  {
+    "id": 472,
+    "slug": "the-elder-scrolls-v-skyrim",
+    "name": "The Elder Scrolls V: Skyrim",
+    "summary": "Skyrim reimagines and revolutionizes the open-world fantasy epic, bringing to life a complete virtual world open for you to explore any way you choose. As the last Dragonborn you are the only one who can stand against the dragons returning to the northern province of Tamriel. Hunt down ancient shouts, forge your own path through hundreds of quests, and shape a character with no classes and no limits.",
+    "first_release_date": 1320969600,
+    "game_type": {
+      "id": 0,
+      "type": "Main Game"
+    },
+    "cover": {
+      "id": 90001,
+      "image_id": "cotestskyrim1"
+    },
+    "genres": [
+      {
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "name": "Adventure"
+      }
+    ],
+    "platforms": [
+      {
+        "name": "PC (Microsoft Windows)",
+        "abbreviation": "PC"
+      },
+      {
+        "name": "PlayStation 3",
+        "abbreviation": "PS3"
+      },
+      {
+        "name": "Xbox 360",
+        "abbreviation": "X360"
+      }
+    ],
+    "involved_companies": [
+      {
+        "developer": true,
+        "publisher": false,
+        "company": {
+          "name": "Bethesda Game Studios"
+        }
+      },
+      {
+        "developer": false,
+        "publisher": true,
+        "company": {
+          "name": "Bethesda Softworks"
+        }
+      }
+    ],
+    "aggregated_rating": 89.3,
+    "aggregated_rating_count": 31,
+    "rating": 87.4,
+    "rating_count": 2210,
+    "total_rating": 88.3,
+    "total_rating_count": 2241,
+    "game_modes": [
+      {
+        "name": "Single player"
+      }
+    ],
+    "external_games": [
+      {
+        "uid": "72850",
+        "url": "https://store.steampowered.com/app/72850",
+        "external_game_source": {
+          "name": "Steam"
+        }
+      },
+      {
+        "uid": "1207658805",
+        "url": "https://www.gog.com/game/the_elder_scrolls_v_skyrim",
+        "external_game_source": {
+          "name": "GOG"
+        }
+      }
+    ],
+    "websites": [
+      {
+        "url": "https://elderscrolls.bethesda.net/en/skyrim",
+        "type": {
+          "type": "Official"
+        }
+      },
+      {
+        "url": "https://store.steampowered.com/app/72850/",
+        "type": {
+          "type": "Steam"
+        }
+      }
+    ],
+    "alternative_names": [
+      {
+        "name": "Skyrim"
+      }
+    ],
+    "age_ratings": [
+      {
+        "organization": {
+          "name": "ESRB"
+        },
+        "rating_category": {
+          "rating": "M"
+        }
+      },
+      {
+        "organization": {
+          "name": "PEGI"
+        },
+        "rating_category": {
+          "rating": "18"
+        }
+      }
+    ]
+  },
+  {
+    "id": 19560,
+    "slug": "the-elder-scrolls-v-skyrim-special-edition",
+    "name": "The Elder Scrolls V: Skyrim Special Edition",
+    "summary": "The epic fantasy reborn. Skyrim Special Edition brings the epic fantasy to life in stunning detail, with remastered art and effects, volumetric god rays, dynamic depth of field and more.",
+    "first_release_date": 1477612800,
+    "game_type": {
+      "id": 9,
+      "type": "Remaster"
+    },
+    "cover": {
+      "id": 90002,
+      "image_id": "cotestskyrimse"
+    },
+    "genres": [
+      {
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "name": "Adventure"
+      }
+    ],
+    "platforms": [
+      {
+        "name": "PC (Microsoft Windows)",
+        "abbreviation": "PC"
+      },
+      {
+        "name": "PlayStation 4",
+        "abbreviation": "PS4"
+      },
+      {
+        "name": "Xbox One",
+        "abbreviation": "XONE"
+      },
+      {
+        "name": "Nintendo Switch",
+        "abbreviation": "Switch"
+      }
+    ],
+    "involved_companies": [
+      {
+        "developer": true,
+        "publisher": false,
+        "company": {
+          "name": "Bethesda Game Studios"
+        }
+      },
+      {
+        "developer": false,
+        "publisher": true,
+        "company": {
+          "name": "Bethesda Softworks"
+        }
+      }
+    ],
+    "aggregated_rating": 91.0,
+    "aggregated_rating_count": 14,
+    "rating": 85.2,
+    "rating_count": 840,
+    "total_rating": 86.0,
+    "total_rating_count": 854,
+    "game_modes": [
+      {
+        "name": "Single player"
+      }
+    ],
+    "external_games": [
+      {
+        "uid": "489830",
+        "url": "https://store.steampowered.com/app/489830",
+        "external_game_source": {
+          "name": "steam"
+        }
+      }
+    ],
+    "websites": [
+      {
+        "url": "https://elderscrolls.bethesda.net/en/skyrim",
+        "type": {
+          "type": "Official"
+        }
+      }
+    ],
+    "age_ratings": [
+      {
+        "organization": {
+          "name": "ESRB"
+        },
+        "rating_category": {
+          "rating": "M"
+        }
+      },
+      {
+        "organization": {
+          "name": "PEGI"
+        },
+        "rating_category": {
+          "rating": "18"
+        }
+      }
+    ]
+  },
+  {
+    "id": 28420,
+    "slug": "the-elder-scrolls-v-skyrim-vr",
+    "name": "The Elder Scrolls V: Skyrim VR",
+    "summary": "Skyrim in virtual reality, with full motion controls.",
+    "first_release_date": 1510876800,
+    "game_type": {
+      "id": 11,
+      "type": "Port"
+    },
+    "cover": {
+      "id": 90003,
+      "image_id": "cotestskyrimvr"
+    },
+    "genres": [
+      {
+        "name": "Role-playing (RPG)"
+      }
+    ],
+    "platforms": [
+      {
+        "name": "PC (Microsoft Windows)",
+        "abbreviation": "PC"
+      },
+      {
+        "name": "PlayStation VR",
+        "abbreviation": "PSVR"
+      }
+    ],
+    "involved_companies": [
+      {
+        "developer": true,
+        "publisher": false,
+        "company": {
+          "name": "Bethesda Game Studios"
+        }
+      },
+      {
+        "developer": false,
+        "publisher": true,
+        "company": {
+          "name": "Bethesda Softworks"
+        }
+      }
+    ],
+    "aggregated_rating": 72.0,
+    "aggregated_rating_count": 6,
+    "rating": 74.0,
+    "rating_count": 310,
+    "total_rating": 73.5,
+    "total_rating_count": 316,
+    "game_modes": [
+      {
+        "name": "Single player"
+      },
+      {
+        "name": "Virtual Reality"
+      }
+    ],
+    "websites": [
+      {
+        "url": "https://store.steampowered.com/app/611670/The_Elder_Scrolls_V_Skyrim_VR/",
+        "type": {
+          "type": "Steam"
+        }
+      }
+    ],
+    "age_ratings": [
+      {
+        "organization": {
+          "name": "ESRB"
+        },
+        "rating_category": {
+          "rating": "M"
+        }
+      }
+    ]
+  },
+  {
+    "id": 33300,
+    "slug": "the-elder-scrolls-v-skyrim-dawnguard",
+    "name": "The Elder Scrolls V: Skyrim - Dawnguard",
+    "summary": "An expansion for Skyrim about the war between vampires and the Dawnguard.",
+    "first_release_date": 1343865600,
+    "game_type": {
+      "id": 1,
+      "type": "DLC"
+    },
+    "parent_game": 472,
+    "cover": {
+      "id": 90004,
+      "image_id": "cotestdawnguard"
+    },
+    "genres": [
+      {
+        "name": "Role-playing (RPG)"
+      }
+    ],
+    "platforms": [
+      {
+        "name": "PC (Microsoft Windows)",
+        "abbreviation": "PC"
+      },
+      {
+        "name": "Xbox 360",
+        "abbreviation": "X360"
+      }
+    ],
+    "involved_companies": [
+      {
+        "developer": true,
+        "publisher": false,
+        "company": {
+          "name": "Bethesda Game Studios"
+        }
+      }
+    ],
+    "total_rating": 80.0,
+    "total_rating_count": 410,
+    "rating": 80.0,
+    "rating_count": 410
+  },
+  {
+    "id": 99001,
+    "slug": "skyrim-total-overhaul",
+    "name": "Skyrim: Total Overhaul",
+    "summary": "A fan made total conversion.",
+    "first_release_date": 1519862400,
+    "game_type": {
+      "id": 5,
+      "type": "Mod"
+    },
+    "cover": {
+      "id": 90005,
+      "image_id": "cotestmod"
+    },
+    "genres": [
+      {
+        "name": "Role-playing (RPG)"
+      }
+    ],
+    "platforms": [
+      {
+        "name": "PC (Microsoft Windows)",
+        "abbreviation": "PC"
+      }
+    ],
+    "involved_companies": [
+      {
+        "developer": true,
+        "publisher": false,
+        "company": {
+          "name": "Some Modders"
+        }
+      }
+    ],
+    "total_rating": 70.0,
+    "total_rating_count": 40,
+    "rating": 70.0,
+    "rating_count": 40
+  }
+]

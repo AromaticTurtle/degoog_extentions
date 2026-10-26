@@ -1,33 +1,42 @@
-.rawg-result {
+.game-info-result {
   padding: 0;
   color: var(--text-primary);
 }
 
-.rawg-card {
-  overflow: hidden;
-  border-radius: 12px;
+.game-info-card {
+  min-width: 0;
 }
 
-.rawg-cover {
+.game-info-hero {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-bottom: 0.7rem;
+}
+
+.game-info-cover {
+  flex: 0 0 100px;
+  width: 100px;
+  aspect-ratio: 264 / 374;
   display: block;
-  aspect-ratio: 3 / 2;
   background: var(--bg-light);
+  border-radius: 8px;
   overflow: hidden;
-  border-radius: 12px;
 }
 
-.rawg-cover img {
+.game-info-cover img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.rawg-body {
-  padding: 0.75rem 0.1rem 0.25rem;
+.game-info-body {
+  flex: 1;
+  min-width: 0;
 }
 
-.rawg-kicker {
+.game-info-kicker {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -35,98 +44,121 @@
   margin-bottom: 0.2rem;
 }
 
-.rawg-title-link {
+.game-info-title-link {
   color: inherit;
   text-decoration: none;
 }
 
-.rawg-title-link:hover .rawg-title {
+.game-info-title-link:hover .game-info-title {
   text-decoration: underline;
 }
 
-.rawg-title {
-  margin: 0 0 0.6rem;
-  font-size: 1.25rem;
+.game-info-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
   font-weight: 600;
   line-height: 1.2;
   color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
-.rawg-scores {
+.game-info-scores {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 0.7rem;
+  gap: 0.35rem;
 }
 
-.rawg-score {
+.game-info-score {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   min-width: 3.4rem;
-  padding: 0.3rem 0.55rem;
+  padding: 0.3rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 1rem;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.15;
   color: var(--text-primary);
+  text-decoration: none;
 }
 
-.rawg-score small {
-  font-size: 0.62rem;
+.game-info-score small {
+  font-size: 0.6rem;
   font-weight: 500;
   color: var(--text-secondary);
 }
 
-.rawg-score--good {
+.game-info-score--good {
   border-color: #4caf50;
   color: #4caf50;
 }
 
-.rawg-score--mixed {
+.game-info-score--mixed {
   border-color: #e0a800;
   color: #e0a800;
 }
 
-.rawg-score--bad {
+.game-info-score--bad {
   border-color: #e5534b;
   color: #e5534b;
 }
 
-.rawg-desc {
-  margin: 0 0 0.6rem;
+a.game-info-score:hover {
+  background: var(--bg-light);
+}
+
+.game-info-proton--platinum {
+  border-color: #8fb4d9;
+  color: #8fb4d9;
+}
+
+.game-info-proton--gold {
+  border-color: #cfb53b;
+  color: #cfb53b;
+}
+
+.game-info-proton--silver {
+  border-color: #a6a6a6;
+  color: #a6a6a6;
+}
+
+.game-info-proton--bronze {
+  border-color: #cd7f32;
+  color: #cd7f32;
+}
+
+.game-info-proton--borked {
+  border-color: #e5534b;
+  color: #e5534b;
+}
+
+.game-info-proton--pending {
+  border-color: #7a7a7a;
+  color: #7a7a7a;
+}
+
+.game-info-desc {
+  margin: 0 0 0.7rem;
   font-size: 0.875rem;
   line-height: 1.5;
   color: var(--text-primary);
-  white-space: pre-line;
 }
 
-.rawg-more {
-  margin: -0.2rem 0 0.6rem;
-}
-
-.rawg-more summary {
-  cursor: pointer;
-  font-size: 0.8rem;
-  color: var(--text-link, var(--primary, #1a73e8));
-  margin-bottom: 0.4rem;
-}
-
-.rawg-facts {
+.game-info-facts {
   margin: 0 0 0.7rem;
   display: grid;
   gap: 0.45rem;
 }
 
-.rawg-fact {
+.game-info-fact {
   display: grid;
   grid-template-columns: 6.5rem 1fr;
   gap: 0.5rem;
   font-size: 0.8125rem;
 }
 
-.rawg-fact dt {
+.game-info-fact dt {
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -135,7 +167,7 @@
   padding-top: 0.1rem;
 }
 
-.rawg-fact dd {
+.game-info-fact dd {
   margin: 0;
   min-width: 0;
   display: flex;
@@ -144,7 +176,7 @@
   line-height: 1.4;
 }
 
-.rawg-chip {
+.game-info-chip {
   padding: 0.05rem 0.5rem;
   border-radius: 999px;
   background: var(--bg-light);
@@ -152,30 +184,30 @@
   font-size: 0.75rem;
 }
 
-.rawg-links {
+.game-info-links {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem 0.9rem;
   margin-bottom: 0.6rem;
 }
 
-.rawg-link {
+.game-info-link {
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-link, var(--primary, #1a73e8));
   text-decoration: none;
 }
 
-.rawg-link:hover {
+.game-info-link:hover {
   text-decoration: underline;
 }
 
-.rawg-attribution {
+.game-info-attribution {
   font-size: 0.7rem;
   color: var(--text-secondary);
 }
 
-.rawg-attribution a {
+.game-info-attribution a {
   color: var(--text-secondary);
   text-decoration: underline;
 }

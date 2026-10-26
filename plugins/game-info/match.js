@@ -1,3 +1,15 @@
+// Tuning constants. Popularity is IGDB's rating count (players plus critics).
+export const SUBTITLE_EXACT = 0.88;
+export const EXACT_MIN_POPULARITY = 5;
+export const PREFIX_MIN_POPULARITY = 30;
+export const SUBTITLE_MIN_POPULARITY = 150;
+export const INTENT_MIN_SIMILARITY = 0.9;
+export const INTENT_LOOSE_MIN_SIMILARITY = 0.8;
+export const INTENT_LOOSE_MIN_POPULARITY = 20;
+
+// IGDB game types that are the game itself. A missing type is accepted too.
+export const ACCEPTED_GAME_TYPES = ["main game", "remake", "remaster", "expanded game", "port", "standalone expansion"];
+
 // Words that say "this is about a video game" without being part of a title.
 // Only trailing ones are removed, so "game dev tycoon" keeps its first word.
 const TRAILING_WORDS = [
@@ -67,6 +79,14 @@ export const normalizeTitle = (text) =>
     .trim()
     .replace(/^the /, "");
 
+const segments = (title) => String(title ?? "").split(/\s*:\s*|\s+[-–—]\s+/);
+
+// "The Elder Scrolls V: Skyrim" -> ["skyrim"]. Lets a one-word query find a game by its subtitle.
+export const subtitles = (title) => segments(title).slice(1).map(normalizeTitle).filter(Boolean);
+
+// "The Elder Scrolls V: Skyrim" -> "elder scrolls v". Tells apart two series that share a subtitle.
+const series = (title) => normalizeTitle(segments(title)[0]);
+
 export const titleSimilarity = (query, title) => {
   const q = normalizeTitle(query);
   const t = normalizeTitle(title);
@@ -78,6 +98,7 @@ export const titleSimilarity = (query, title) => {
     const extra = q.slice(t.length + 1).split(" ");
     return extra.some((word) => /\d/.test(word) || /^[ivxl]+$/.test(word)) ? 0.5 : 0.9;
   }
+  if (subtitles(title).includes(q)) return SUBTITLE_EXACT;
   const qWords = q.split(" ");
   const tWords = new Set(t.split(" "));
   const shared = qWords.filter((word) => tWords.has(word)).length;
@@ -85,25 +106,40 @@ export const titleSimilarity = (query, title) => {
   return shared / Math.max(qWords.length, t.split(" ").length);
 };
 
-const popularity = (game) => Number(game?.added) || 0;
+export const popularity = (game) =>
+  Number(game?.totalRatingCount) || (Number(game?.userCount) || 0) + (Number(game?.criticCount) || 0);
+
+export const isAcceptedType = (gameType) => {
+  const type = String(gameType ?? "").trim().toLowerCase();
+  return !type || ACCEPTED_GAME_TYPES.includes(type);
+};
 
 export const isConfidentMatch = (term, game, intent) => {
   const sim = titleSimilarity(term, game?.name);
-  const added = popularity(game);
-  if (sim >= 1 && added >= 50) return true;
-  if (sim >= 0.9 && added >= 300) return true;
-  if (intent && sim >= 0.9) return true;
-  if (intent && sim >= 0.8 && added >= 100) return true;
+  const pop = popularity(game);
+  if (sim >= 1 && pop >= EXACT_MIN_POPULARITY) return true;
+  if (sim >= 0.9 && pop >= PREFIX_MIN_POPULARITY) return true;
+  if (sim >= SUBTITLE_EXACT && pop >= SUBTITLE_MIN_POPULARITY) return true;
+  if (intent && sim >= INTENT_MIN_SIMILARITY) return true;
+  if (intent && sim >= INTENT_LOOSE_MIN_SIMILARITY && pop >= INTENT_LOOSE_MIN_POPULARITY) return true;
   return false;
 };
 
-// Several RAWG entries share names (fan games, ports, re-releases), so take the closest title, then the most added.
+// Several IGDB entries share names (mods, ports, re-releases), so take the closest title, then the most rated.
+// A subtitle-only match ("origins") that fits games of different series is ambiguous, so nothing is shown
+// unless the query also says it is about a game.
 export const pickGame = (term, results, intent) => {
   const candidates = (Array.isArray(results) ? results : [])
-    .filter((game) => game && game.id && game.name && isConfidentMatch(term, game, intent))
+    .filter((game) => game && game.id && game.name && isAcceptedType(game.gameType) && isConfidentMatch(term, game, intent))
     .map((game) => ({ game, sim: titleSimilarity(term, game.name) }))
     .sort((a, b) => b.sim - a.sim || popularity(b.game) - popularity(a.game));
-  return candidates[0]?.game ?? null;
+  const best = candidates[0];
+  if (!best) return null;
+  if (!intent && best.sim === SUBTITLE_EXACT && subtitles(best.game.name).includes(normalizeTitle(term))) {
+    const rival = candidates.some((other) => other.sim === best.sim && series(other.game.name) !== series(best.game.name));
+    if (rival) return null;
+  }
+  return best.game;
 };
 
 export const cacheKey = (term) => normalizeTitle(term).slice(0, 120);
