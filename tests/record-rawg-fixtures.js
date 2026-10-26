@@ -23,11 +23,14 @@ const first = search.results?.[0];
 if (!first) throw new Error("No results for that search");
 const detail = await get(buildDetailUrl(first.id, key));
 
+// RAWG's "next" and "previous" fields are full URLs that contain the API key, so they are removed,
+// and nothing is written if the key still appears anywhere in the output.
 const save = (name, data) => {
-  const path = new URL(`./fixtures/${name}`, import.meta.url);
-  writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`);
+  const text = `${JSON.stringify(data, null, 2)}\n`;
+  if (text.includes(key) || /[?&]key=/.test(text)) throw new Error(`Refusing to save ${name}: it still contains an API key`);
+  writeFileSync(new URL(`./fixtures/${name}`, import.meta.url), text);
   console.log(`saved ${name}`);
 };
-save("rawg-search.json", { ...search, results: search.results.slice(0, 5) });
+save("rawg-search.json", { ...search, next: null, previous: null, results: search.results.slice(0, 5) });
 save("rawg-detail.json", detail);
 console.log(`Top result: ${first.name} (id ${first.id}). Run the tests; some expectations assume Elden Ring.`);

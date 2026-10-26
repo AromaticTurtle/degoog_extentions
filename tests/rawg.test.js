@@ -114,6 +114,9 @@ describe("title matching", () => {
     expect(titleSimilarity("elden ring", "Elden Ring: Shadow of the Erdtree")).toBe(0.9);
     expect(titleSimilarity("zelda breath of the wild", "The Legend of Zelda: Breath of the Wild")).toBe(0.8);
     expect(titleSimilarity("cats", "Dogs")).toBe(0);
+    expect(titleSimilarity("hades 2", "Hades")).toBe(0.5);
+    expect(titleSimilarity("final fantasy vii", "Final Fantasy")).toBe(0.5);
+    expect(titleSimilarity("hades game", "Hades")).toBe(0.9);
   });
 
   test("an exact title needs some popularity, an unknown fan game does not qualify", () => {
@@ -131,6 +134,11 @@ describe("title matching", () => {
     ];
     expect(pickGame("hades", twins, false).id).toBe(2);
     expect(pickGame("zzz", results, false)).toBeNull();
+    expect(pickGame("elden ring nightreign", results, false).id).toBe(997548);
+    expect(pickGame("elden ring shadow of the erdtree", results, false).id).toBe(977470);
+    // The exact "Elden Ring Test" entry has no players, so the real game is shown instead of the junk one.
+    expect(pickGame("elden ring test", results, false).id).toBe(326243);
+    expect(pickGame("elden ring build", results, false).id).toBe(326243);
     expect(pickGame("elden ring", [], false)).toBeNull();
     expect(pickGame("elden ring", null, false)).toBeNull();
   });
@@ -145,16 +153,21 @@ describe("shaping RAWG data", () => {
   const detail = compactDetail(detailFixture);
 
   test("search result keeps only used fields", () => {
-    expect(game).toMatchObject({ id: 326243, slug: "elden-ring", name: "Elden Ring", released: "2022-02-25", metacritic: 96, added: 15800, esrb: "Mature" });
+    expect(game).toMatchObject({ id: 326243, slug: "elden-ring", name: "Elden Ring", released: "2022-02-25", metacritic: 95, esrb: "Mature" });
+    expect(game.added).toBeGreaterThan(1000);
+    expect(game.ratingsCount).toBeGreaterThan(100);
+    expect(game.playtime).toBeGreaterThan(0);
+    expect(game.rating).toBeGreaterThan(4);
     expect(game.platforms).toEqual(["PC", "PlayStation", "Xbox"]);
     expect(game.genres).toEqual(["Action", "RPG"]);
-    expect(game.stores).toEqual(["Steam", "PlayStation Store"]);
-    expect(game.ratingsCount).toBe(5200);
+    expect(game.stores).toContain("Steam");
+    expect(game.image).toStartWith("https://media.rawg.io/media/games/");
   });
 
   test("missing and null fields become empty values, not errors", () => {
-    const bare = compactSearchResult(searchFixture.results[2]);
+    const bare = compactSearchResult({ id: 1, name: "X", released: null, background_image: null, metacritic: null, esrb_rating: null, parent_platforms: [], genres: [], stores: [] });
     expect(bare).toMatchObject({ metacritic: 0, image: "", released: "", esrb: "", platforms: [], genres: [], stores: [] });
+    expect(compactSearchResult(searchFixture.results[1]).metacritic).toBe(0);
     expect(compactSearchResult(null).name).toBe("");
     expect(compactDetail(undefined).developers).toEqual([]);
   });
@@ -163,13 +176,18 @@ describe("shaping RAWG data", () => {
     expect(compactSearchResult({ platforms: [{ platform: { name: "Dreamcast" } }] }).platforms).toEqual(["Dreamcast"]);
   });
 
-  test("detail keeps description, people and links; the Spanish copy is cut", () => {
+  test("detail keeps description, people and links", () => {
     expect(detail.developers).toEqual(["FromSoftware"]);
-    expect(detail.publishers).toEqual(["Bandai Namco Entertainment"]);
-    expect(detail.website).toBe("https://www.eldenring.example/");
-    expect(detail.description).toStartWith("A sprawling open-world");
-    expect(detail.description).not.toContain("Español");
-    expect(detail.description).not.toContain("amplio");
+    expect(detail.publishers).toContain("Bandai Namco Entertainment");
+    expect(detail.website).toStartWith("https://");
+    expect(detail.reddit).toBe("https://www.reddit.com/r/Eldenring/");
+    expect(detail.description).toStartWith("The Golden Order has been broken.");
+    expect(detail.playtime).toBeGreaterThan(0);
+  });
+
+  test("a Spanish copy after an Español line is cut, and long text is capped", () => {
+    expect(cleanDescription("English text.\nEspañol\nTexto en español.")).toBe("English text.");
+    expect(cleanDescription("Only English.\n\nSecond paragraph.")).toBe("Only English.\n\nSecond paragraph.");
     expect(cleanDescription(null)).toBe("");
     expect(cleanDescription("x".repeat(5000))).toHaveLength(1800);
   });
@@ -185,13 +203,13 @@ describe("rendering", () => {
     expect(html).toContain("Elden Ring");
     expect(html).toContain("Video game · 2022");
     expect(html).toContain("rawg-score--good");
-    expect(html).toContain(">96<");
+    expect(html).toContain(">95<");
     expect(html).toContain("4.4");
     expect(html).toContain("Mature");
     expect(html).toContain("Feb 25, 2022");
     expect(html).toContain("FromSoftware");
     expect(html).toContain("Bandai Namco Entertainment");
-    expect(html).toContain("about 56 h");
+    expect(html).toContain("about 62 h");
     expect(html).toContain("Read more");
     expect(html).toContain(encodeURIComponent("https://media.rawg.io/media/crop/600/400/games/b29/"));
     expect(html).not.toContain('src="https://media.rawg.io');
@@ -237,6 +255,12 @@ describe("rendering", () => {
     expect(long.preview.endsWith("…")).toBe(true);
     expect(long.preview.length).toBeLessThan(340);
     expect(long.rest.length).toBeGreaterThan(100);
+    const paragraphs = splitDescription(`${"First paragraph sentence. ".repeat(8).trim()}\n\n${"Second paragraph sentence. ".repeat(20)}`);
+    expect(paragraphs.preview.endsWith("sentence.")).toBe(true);
+    expect(paragraphs.preview).not.toContain("Second");
+    expect(paragraphs.rest).toStartWith("Second paragraph");
+    const sentences = splitDescription("A sentence here. ".repeat(40));
+    expect(sentences.preview.endsWith("here.")).toBe(true);
   });
 });
 

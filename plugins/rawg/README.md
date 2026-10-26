@@ -33,6 +33,7 @@ RAWG is only called for queries that look like a game title. The plugin checks, 
 4. RAWG is asked for the 5 best matches (**1 request**), and the panel shows only if one is a confident match: the title
    matches (ignoring case, accents, punctuation, a leading "the" and a year such as "(2016)") and the game is popular enough
    not to be a fan project with the same name. A game word in the query (`hades game`) relaxes the popularity bar a little.
+   A trailing number or numeral counts as a different game, so `hades 2` does not show the first Hades.
    If several RAWG entries share the name, the closest title wins, then the one most players have added.
 5. For a match, **1 more request** fetches the full details (description, developer, publisher, website).
 
@@ -61,9 +62,10 @@ same game again costs nothing.
 - **Monthly request limit**: see above.
 
 ## Development notes
-- `tests/fixtures/rawg-search.json` and `rawg-detail.json` are **hand-written** to the field layout in RAWG's documentation,
-  not real responses. To replace them with real ones (2 requests, key never leaves your machine), run in your own terminal:
-  `RAWG_API_KEY=your-key bun tests/record-rawg-fixtures.js "elden ring"`
+- `tests/fixtures/rawg-search.json` and `rawg-detail.json` are **real RAWG responses** for "elden ring" (a search trimmed to
+  5 results, and one game detail). RAWG's `next` link in a search reply contains the API key, so it is removed. To re-record
+  them (2 requests, key stays on your machine): `RAWG_API_KEY=your-key bun ./tests/record-rawg-fixtures.js "elden ring"`.
+  The script refuses to save a file that still contains a key.
 - `tests/mock-rawg-server.js` is a small local stand-in for the API, used for checking the plugin inside a real degoog
   container (`DEGOOG_RAWG_API_BASE` points the plugin at it).
 - The panel's settings are stored under the id `rawg-slot`.

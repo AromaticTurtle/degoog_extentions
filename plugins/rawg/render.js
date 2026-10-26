@@ -27,11 +27,18 @@ export const formatDate = (iso, locale) => {
   }
 };
 
+// Cuts at the last paragraph or sentence end in the second half of the preview window, else at a word.
 export const splitDescription = (description, previewChars = 320) => {
   const text = String(description ?? "").trim();
   if (text.length <= previewChars + 80) return { preview: text, rest: "" };
-  const space = text.lastIndexOf(" ", previewChars);
-  const cut = space > previewChars / 2 ? space : previewChars;
+  const window = text.slice(0, previewChars);
+  const half = previewChars / 2;
+  const paragraph = window.lastIndexOf("\n\n");
+  if (paragraph >= half) return { preview: text.slice(0, paragraph).trimEnd(), rest: text.slice(paragraph).trim() };
+  const sentence = Math.max(window.lastIndexOf(". "), window.lastIndexOf("! "), window.lastIndexOf("? "));
+  if (sentence >= half) return { preview: text.slice(0, sentence + 1), rest: text.slice(sentence + 1).trim() };
+  const space = window.lastIndexOf(" ");
+  const cut = space > half ? space : previewChars;
   return { preview: `${text.slice(0, cut).trimEnd()}…`, rest: text.slice(cut).trim() };
 };
 

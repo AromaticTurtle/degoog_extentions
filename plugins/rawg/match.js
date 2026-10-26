@@ -72,7 +72,12 @@ export const titleSimilarity = (query, title) => {
   const t = normalizeTitle(title);
   if (!q || !t) return 0;
   if (q === t) return 1;
-  if (t.startsWith(`${q} `) || q.startsWith(`${t} `)) return 0.9;
+  if (t.startsWith(`${q} `)) return 0.9;
+  if (q.startsWith(`${t} `)) {
+    // "hades 2" must not match "Hades": a trailing number or numeral names a different game.
+    const extra = q.slice(t.length + 1).split(" ");
+    return extra.some((word) => /\d/.test(word) || /^[ivxl]+$/.test(word)) ? 0.5 : 0.9;
+  }
   const qWords = q.split(" ");
   const tWords = new Set(t.split(" "));
   const shared = qWords.filter((word) => tWords.has(word)).length;
