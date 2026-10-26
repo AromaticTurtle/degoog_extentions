@@ -1,34 +1,22 @@
 import { SETTINGS_SCHEMA } from "./settings.js";
-import { Budget, usageFile } from "./budget.js";
-import {
-  DEFAULT_API_BASE,
-  buildHeaders,
-  buildSearchUrl,
-  buildThingUrl,
-  looksBlocked,
-  normalizeToken,
-  readText,
-  retryAfterMs,
-  sanitizeTerm,
-} from "./request.js";
-import { cacheKey, extractTerm, hasBoardGameWord, isVideoGameQuery, looksLikeATitleSearch, pickGame, rankCandidates } from "./match.js";
-import { SEARCH_MAX_CHARS, THING_MAX_CHARS, parseThings, scanSearch } from "./shape.js";
+import { sanitizeTerm } from "./request.js";
+import { extractTerm, hasBoardGameWord, isVideoGameQuery, looksLikeATitleSearch } from "./match.js";
 import { buildPanel } from "./render.js";
+import { BggApiSource } from "./sources/bgg-api.js";
+import { RecommendGamesSource } from "./sources/recommend-games.js";
+import { BggInternalSource } from "./sources/bgg-internal.js";
 
-const SEARCH_TTL_MS = 24 * 60 * 60_000;
-const THING_TTL_MS = 7 * 24 * 60 * 60_000;
-const RATE_PAUSE_MS = 10 * 60_000;
-const BLOCK_PAUSE_MS = 30 * 60_000;
-const ERROR_PAUSE_MS = 60_000;
-const BUDGET_RECHECK_MS = 60 * 60_000;
 const MIN_SPACING_MS = 1000;
-const DEFAULT_DAILY_LIMIT = 300;
-// degoog gives a slot 10 s (DEGOOG_SLOT_TIMEOUT_MS). A request may only start while there is still time for it to finish.
-const REQUEST_HEADROOM_MS = 3000;
 const FALLBACK_TEMPLATE = '<div class="command-result board-games-result">{{content}}</div>';
 const EMPTY = { title: "", html: "" };
 
 const truthy = (value, fallback) => (value === undefined || value === "" ? fallback : value === true || value === "true");
+
+// A daily request limit: a whole number of 0 or more (0 = no cap), else the default.
+const limitOf = (value, fallback) => {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+};
 
 const slotTimeoutMs = () => {
   const configured = Number.parseInt(process.env.DEGOOG_SLOT_TIMEOUT_MS ?? "", 10);
@@ -54,32 +42,43 @@ const localCache = (ttlMs, now) => {
   };
 };
 
+// The panel is filled by the first usable source that answers, in a fixed order:
+// 1) the BGG XML API, 2) recommend.games, 3) BGG's website JSON API (ids from Wikidata or from an earlier source).
+// A source that answers ("ok") ends the chain, even with "no confident match". One that is
+// "unavailable" (disabled, paused, over its limit, an error, a block page...) hands over to the next.
 export class BoardGamesSlot {
   isClientExposed = false;
   id = "board-games";
   name = "Board games (BoardGameGeek)";
-  description = "Shows a board game information panel (rating, rank, weight, players, playing time, designers, mechanics) from BoardGameGeek.";
+  description = "Shows a board game information panel (rating, rank, weight, players, playing time, designers, mechanics) from BoardGameGeek data.";
   position = "knowledge-panel";
   slotPositions = ["knowledge-panel", "above-sidebar", "below-sidebar", "above-results"];
   settingsSchema = SETTINGS_SCHEMA;
 
-  apiToken = "";
   requireBoardGameWord = false;
   showDescription = true;
-  apiBase = process.env.DEGOOG_BGG_API_BASE || DEFAULT_API_BASE;
   now = Date.now;
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   spacingMs = MIN_SPACING_MS;
-  startWindowMs = Math.max(1000, slotTimeoutMs() - REQUEST_HEADROOM_MS);
-  budget = new Budget({ file: usageFile(process.env.DEGOOG_DATA_DIR || "data"), cap: DEFAULT_DAILY_LIMIT, now: () => this.now() });
+  // degoog gives a slot 10 s (DEGOOG_SLOT_TIMEOUT_MS). No request is started after 70 % of it, in the whole chain.
+  startWindowMs = Math.max(1000, Math.round(slotTimeoutMs() * 0.7));
 
   template = FALLBACK_TEMPLATE;
   _signProxy = null;
-  _pausedUntil = 0;
-  _lastRequestAt = 0;
-  _gateChain = Promise.resolve();
   _local = {};
   _inflight = new Map();
+
+  constructor() {
+    this.sources = {
+      api: new BggApiSource(this),
+      recommend: new RecommendGamesSource(this),
+      internal: new BggInternalSource(this),
+    };
+  }
+
+  get chain() {
+    return [this.sources.api, this.sources.recommend, this.sources.internal];
+  }
 
   init(context) {
     if (context?.template) this.template = context.template;
@@ -87,106 +86,40 @@ export class BoardGamesSlot {
   }
 
   configure(settings = {}) {
-    this.apiToken = normalizeToken(String(settings.apiToken ?? "").trim() ? settings.apiToken : process.env.BGG_API_TOKEN);
+    const uiToken = String(settings.apiToken ?? "").trim();
+    this.sources.api.configure({
+      enabled: truthy(settings.enableApi, true),
+      token: uiToken ? settings.apiToken : process.env.BGG_API_TOKEN,
+      limit: limitOf(settings.dailyRequestLimit, 300),
+    });
+    this.sources.recommend.configure({
+      enabled: truthy(settings.enableRecommendGames, true),
+      limit: limitOf(settings.recommendGamesDailyLimit, 500),
+    });
+    this.sources.internal.configure({
+      enabled: truthy(settings.enableBggInternal, false),
+      limit: limitOf(settings.internalDailyLimit, 100),
+    });
     this.requireBoardGameWord = truthy(settings.requireBoardGameWord, false);
     this.showDescription = truthy(settings.showDescription, true);
-    const limit = Number.parseInt(String(settings.dailyRequestLimit ?? ""), 10);
-    this.budget.cap = Number.isFinite(limit) && limit >= 0 ? limit : DEFAULT_DAILY_LIMIT;
-  }
-
-  get paused() {
-    return this.now() < this._pausedUntil;
   }
 
   trigger(query) {
-    if (!this.apiToken || this.paused || this.budget.exhausted) return false;
+    if (!this.chain.some((source) => source.usable())) return false;
     if (!looksLikeATitleSearch(query)) return false;
     if (isVideoGameQuery(query)) return false;
     if (this.requireBoardGameWord && !hasBoardGameWord(query)) return false;
     return true;
   }
 
-  _cache(context, name, ttlMs) {
+  // What the sources need from the slot: a cache (degoog's, or a local one) and in-flight de-duplication.
+  cache(context, name, ttlMs) {
     if (typeof context?.useCache === "function") return context.useCache(`ext:board-games:${name}`, ttlMs);
     this._local[name] ??= localCache(ttlMs, this.now);
     return this._local[name];
   }
 
-  _pause(ms, reason) {
-    const wasPaused = this.paused;
-    this._pausedUntil = Math.max(this._pausedUntil, this.now() + ms);
-    if (!wasPaused) console.warn(`[board-games] ${reason}; paused for ${Math.ceil(ms / 60_000)} min`);
-  }
-
-  // Requests queue up here and keep at least spacingMs apart. False means the wait would not fit
-  // in the time degoog gives the slot, so the request is skipped rather than made late.
-  async _gate(deadline) {
-    const before = this._gateChain;
-    let release;
-    this._gateChain = new Promise((resolve) => {
-      release = resolve;
-    });
-    await before;
-    try {
-      const wait = this._lastRequestAt + this.spacingMs - this.now();
-      if (wait > 0) {
-        if (this.now() + wait > deadline) return false;
-        await this.sleep(wait);
-      } else if (this.now() > deadline) return false;
-      this._lastRequestAt = this.now();
-      return true;
-    } finally {
-      release();
-    }
-  }
-
-  // One BGG request. Resolves to the XML text, or null when it failed or must not be made.
-  // The token is only ever in the Authorization header, and only generic text is logged.
-  async _bgg(url, context, deadline, maxChars) {
-    if (this.paused || !url) return null;
-    if (!(await this._gate(deadline))) return null;
-    if (this.paused) return null;
-    if (!this.budget.spend()) {
-      this._pause(Math.min(BUDGET_RECHECK_MS, this.budget.msUntilReset), "the daily BGG request limit is reached");
-      return null;
-    }
-    const doFetch = context?.fetch ?? fetch;
-    let response;
-    try {
-      response = await doFetch(url, { headers: buildHeaders(this.apiToken) });
-    } catch {
-      this._pause(ERROR_PAUSE_MS, "BGG could not be reached");
-      return null;
-    } finally {
-      this._lastRequestAt = this.now();
-    }
-    const status = response.status;
-    if (status === 429) {
-      this._pause(retryAfterMs(response.headers?.get?.("retry-after"), RATE_PAUSE_MS), "BGG rate limited this instance");
-      return null;
-    }
-    if (status === 401 || status === 403) {
-      this._pause(BLOCK_PAUSE_MS, "BGG rejected the API token or blocked the request");
-      return null;
-    }
-    if (status === 202) {
-      this._pause(ERROR_PAUSE_MS, "BGG asked to try again later");
-      return null;
-    }
-    if (status >= 500) {
-      this._pause(ERROR_PAUSE_MS, `BGG answered HTTP ${status}`);
-      return null;
-    }
-    if (status < 200 || status >= 300) return null;
-    const body = await readText(response, maxChars);
-    if (looksBlocked(body)) {
-      this._pause(BLOCK_PAUSE_MS, "BGG rejected the API token or blocked the request");
-      return null;
-    }
-    return body.trimStart().startsWith("<") ? body : null;
-  }
-
-  async _once(name, key, work) {
+  async once(name, key, work) {
     const id = `${name}:${key}`;
     if (!this._inflight.has(id)) {
       this._inflight.set(id, work().finally(() => this._inflight.delete(id)));
@@ -194,45 +127,21 @@ export class BoardGamesSlot {
     return this._inflight.get(id);
   }
 
-  // Search -> the ids of the results whose title is close to the term (possibly none). null when it failed.
-  async _candidates(term, context, deadline) {
-    const cache = this._cache(context, "search", SEARCH_TTL_MS);
-    const key = cacheKey(term);
-    const cached = await cache.get(key);
-    if (cached && Array.isArray(cached.ids)) return cached.ids;
-    return this._once("search", key, async () => {
-      const body = await this._bgg(buildSearchUrl(term, this.apiBase), context, deadline, SEARCH_MAX_CHARS);
-      if (body === null) return null;
-      const { items, valid } = scanSearch(body);
-      if (!valid) return null;
-      const ids = rankCandidates(term, items);
-      await cache.set(key, { ids });
-      return ids;
-    });
-  }
-
-  // The compact details of the candidates: cached ones as they are, the rest in one batch request.
-  async _things(ids, context, deadline) {
-    const cache = this._cache(context, "thing", THING_TTL_MS);
-    const found = new Map();
-    const missing = [];
-    for (const id of ids) {
-      const cached = await cache.get(id);
-      if (cached && cached.id === id) found.set(id, cached);
-      else missing.push(id);
+  async _find({ term, intent, context, deadline }) {
+    let hints = {};
+    for (const source of this.chain) {
+      if (this.now() >= deadline) return null;
+      if (!source.usable()) continue;
+      let result;
+      try {
+        result = await source.lookup({ term, intent, context, deadline, hints });
+      } catch {
+        result = { status: "unavailable", reason: "error" };
+      }
+      if (result?.status === "ok") return result.game ?? null;
+      if (result?.hints?.ids?.length) hints = { ...hints, ids: result.hints.ids };
     }
-    if (missing.length) {
-      const games = await this._once("thing", missing.join(","), async () => {
-        const body = await this._bgg(buildThingUrl(missing, this.apiBase), context, deadline, THING_MAX_CHARS);
-        if (body === null) return null;
-        const parsed = parseThings(body);
-        if (!parsed) return null;
-        for (const game of parsed) await cache.set(game.id, game);
-        return parsed;
-      });
-      for (const game of games ?? []) found.set(game.id, game);
-    }
-    return ids.map((id) => found.get(id)).filter(Boolean);
+    return null;
   }
 
   async execute(query, context) {
@@ -241,10 +150,7 @@ export class BoardGamesSlot {
     if (sanitizeTerm(term).length < 2) return EMPTY;
     const deadline = this.now() + this.startWindowMs;
     try {
-      const ids = await this._candidates(term, context, deadline);
-      if (!ids || !ids.length) return EMPTY;
-      const games = await this._things(ids, context, deadline);
-      const game = pickGame(term, games, hasBoardGameWord(query));
+      const game = await this._find({ term, intent: hasBoardGameWord(query), context, deadline });
       if (!game) return EMPTY;
       const html = buildPanel({
         game,

@@ -55,8 +55,8 @@ const playersParts = (game) => {
   const range = min > 0 && max > 0 ? (min === max ? String(min) : `${min}–${max}`) : String(max || min || "");
   const parts = [];
   if (range && range !== "0") parts.push(range);
-  if (game.bestWith) parts.push(`Best with ${game.bestWith}`);
-  if (game.recommendedWith) parts.push(`Recommended ${game.recommendedWith}`);
+  if (game.bestPlayers) parts.push(`Best with ${game.bestPlayers}`);
+  if (game.recommendedPlayers) parts.push(`Recommended ${game.recommendedPlayers}`);
   return parts;
 };
 
@@ -69,15 +69,26 @@ export const playTimeText = (game) => {
   const min = game.minPlayTime;
   const max = game.maxPlayTime;
   if (min > 0 && max > 0 && min !== max) return `${min}–${max} min`;
-  const single = max || min || game.playingTime;
+  const single = max || min;
   return single > 0 ? `${single} min` : "";
 };
 
-// game comes from compactThing.
+const link = (href, label) => `<a href="${href}" target="_blank" rel="noopener">${esc(label)}</a>`;
+
+// Each source is credited the way its terms (or common courtesy) ask. The numbers are BGG's in every case.
+export const attributionHtml = (source) => {
+  if (source === "recommend-games") {
+    return `Data from ${link("https://recommend.games", "recommend.games")} (originally from ${link("https://boardgamegeek.com", "BoardGameGeek")})`;
+  }
+  if (source === "bgg-internal") return `Data from ${link("https://boardgamegeek.com", "BoardGameGeek")}`;
+  return `<a class="board-games-credit" href="https://boardgamegeek.com" target="_blank" rel="noopener">Powered by BGG</a>`;
+};
+
+// game is a normalised game, whichever source it came from (see blankGame in shape.js).
 export const buildPanel = ({ game, signProxy, showDescription = true }) => {
   const year = game.year > 0 ? String(game.year) : "";
   const page = bggPage(game.id);
-  const source = imageUrl(game.image) || imageUrl(game.thumbnail);
+  const source = imageUrl(game.image);
   const signed = source && signProxy ? signProxy(source) : "";
   const image = signed
     ? `<${page ? `a class="board-games-cover" href="${esc(page)}" target="_blank" rel="noopener"` : 'div class="board-games-cover"'}><img src="${esc(signed)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></${page ? "a" : "div"}>`
@@ -88,7 +99,7 @@ export const buildPanel = ({ game, signProxy, showDescription = true }) => {
 
   const summary = showDescription ? summarize(game.description, 300) : "";
   const age = game.minAge > 0 ? `${game.minAge}+` : "";
-  const expansions = game.expansions > 0 ? `${count(game.expansions)} ${game.expansions === 1 ? "expansion" : "expansions"} on BGG` : "";
+  const expansions = game.expansionCount > 0 ? `${count(game.expansionCount)} ${game.expansionCount === 1 ? "expansion" : "expansions"} on BGG` : "";
   const facts = [
     fact("Players", playersHtml(game)),
     fact("Playing time", esc(playTimeText(game))),
@@ -101,7 +112,7 @@ export const buildPanel = ({ game, signProxy, showDescription = true }) => {
   ].join("");
 
   return [
-    `<div class="board-games-card">`,
+    `<div class="board-games-card" data-source="${esc(game.source)}">`,
     `<div class="board-games-hero">`,
     image,
     `<div class="board-games-body">`,
@@ -113,7 +124,7 @@ export const buildPanel = ({ game, signProxy, showDescription = true }) => {
     summary ? `<p class="board-games-desc">${esc(summary)}</p>` : "",
     facts ? `<dl class="board-games-facts">${facts}</dl>` : "",
     page ? `<div class="board-games-links"><a class="board-games-link" href="${esc(page)}" target="_blank" rel="noopener">BGG page</a></div>` : "",
-    `<div class="board-games-attribution"><a class="board-games-credit" href="https://boardgamegeek.com" target="_blank" rel="noopener">Powered by BGG</a></div>`,
+    `<div class="board-games-attribution">${attributionHtml(game.source)}</div>`,
     `</div>`,
   ].join("");
 };

@@ -24,7 +24,7 @@ import {
   sanitizeTerm,
 } from "../plugins/board-games/request.js";
 import { attrOf, childrenOf, decodeEntities, decodeHtmlEntities, firstChild, parseXml, scanXml } from "../plugins/board-games/xml.js";
-import { cleanDescription, compactThing, formatPlayerList, parseThings, scanSearch } from "../plugins/board-games/shape.js";
+import { blankGame, cleanDescription, compactThing, formatPlayerList, parseThings, scanSearch } from "../plugins/board-games/shape.js";
 import {
   CANDIDATE_MIN_SIMILARITY,
   EXACT_MIN_RATINGS,
@@ -132,10 +132,11 @@ const makeContext = ({ search = searchXml, respond, token = TOKEN } = {}) => {
 
 const make = (settings = { apiToken: TOKEN }) => {
   const slot = new BoardGamesSlot();
-  slot.apiBase = "https://bgg.test/xmlapi2";
+  slot.sources.api.base = "https://bgg.test/xmlapi2";
   slot.spacingMs = 0;
-  slot.budget = new Budget({ file: "", cap: 1000, now: () => slot.now() });
-  slot.configure(settings);
+  slot.sources.api.budget = new Budget({ file: "", cap: 1000, now: () => slot.now() });
+  // These tests exercise the BGG XML API on its own; the other sources have their own tests.
+  slot.configure({ enableRecommendGames: "false", enableBggInternal: "false", ...settings });
   return slot;
 };
 
@@ -419,32 +420,30 @@ describe("shaping thing replies", () => {
     expect(THINGS.map((game) => game.id)).toEqual(["900001", "900003", "900004"]);
     expect(STARFALL).toMatchObject({
       id: "900001",
-      itemType: "boardgame",
+      source: "bgg-api",
       name: "Starfall",
       alternates: ["Sternenfall", "Chute d'étoiles"],
       year: 2019,
       image: "https://cf.geekdo-images.com/placeholder-starfall/img/full-900001.jpg",
-      thumbnail: "https://cf.geekdo-images.com/placeholder-starfall/img/thumb-900001.jpg",
       minPlayers: 1,
       maxPlayers: 4,
-      playingTime: 120,
       minPlayTime: 60,
       maxPlayTime: 120,
       minAge: 12,
-      bestWith: "2–3",
-      recommendedWith: "1–4",
+      bestPlayers: "2–3",
+      recommendedPlayers: "1–4",
       designers: ["Ada Quill", "Bo Marlowe"],
       publishers: ["Lantern & Oak Games", "Harbor Lights Publishing"],
       categories: ["Economic", "Science Fiction", "Space Exploration"],
       mechanics: ["Cooperative Game", "Hand Management", "Route Planning", "Solo / Solitaire Game"],
-      expansions: 3,
+      expansionCount: 3,
       rating: 8.52,
       ratingCount: 24310,
       rank: 12,
       weight: 3.91,
-      weightCount: 4210,
     });
-    expect(Object.keys(STARFALL)).toHaveLength(26);
+    expect(Object.keys(STARFALL)).toHaveLength(23);
+    expect(Object.keys(STARFALL).sort()).toEqual(Object.keys(blankGame("x")).sort());
   });
 
   test("the description is decoded, stripped of tags and collapsed", () => {
@@ -465,20 +464,20 @@ describe("shaping thing replies", () => {
   });
 
   test("without BGG's own summary the player counts come from the poll votes", () => {
-    expect(DUEL).toMatchObject({ bestWith: "2", recommendedWith: "2", minPlayers: 2, maxPlayers: 2, rank: 640, weight: 1.8, rating: 7.1, ratingCount: 3200 });
-    expect(LEGACY).toMatchObject({ bestWith: "", recommendedWith: "" });
+    expect(DUEL).toMatchObject({ bestPlayers: "2", recommendedPlayers: "2", minPlayers: 2, maxPlayers: 2, rank: 640, weight: 1.8, rating: 7.1, ratingCount: 3200 });
+    expect(LEGACY).toMatchObject({ bestPlayers: "", recommendedPlayers: "" });
   });
 
   test("both spellings of the recommended summary are accepted, and only well formed text is kept", () => {
     const summary = (name, value) =>
       parseThings(`<items><item type="boardgame" id="5"><name type="primary" value="X"/><poll-summary name="suggested_numplayers"><result name="${name}" value="${value}"/></poll-summary></item></items>`)[0];
-    expect(summary("recommmendedwith", "Recommended with 2–5 players").recommendedWith).toBe("2–5");
-    expect(summary("recommendedwith", "Recommended with 3 players").recommendedWith).toBe("3");
-    expect(summary("bestwith", "Best with 3–4 players").bestWith).toBe("3–4");
-    expect(summary("bestwith", "Best with <b>3</b> players").bestWith).toBe("3");
-    expect(summary("bestwith", "Best with 4+ players").bestWith).toBe("4+");
-    expect(summary("bestwith", "nonsense").bestWith).toBe("");
-    expect(summary("other", "Best with 3 players").bestWith).toBe("");
+    expect(summary("recommmendedwith", "Recommended with 2–5 players").recommendedPlayers).toBe("2–5");
+    expect(summary("recommendedwith", "Recommended with 3 players").recommendedPlayers).toBe("3");
+    expect(summary("bestwith", "Best with 3–4 players").bestPlayers).toBe("3–4");
+    expect(summary("bestwith", "Best with <b>3</b> players").bestPlayers).toBe("3");
+    expect(summary("bestwith", "Best with 4+ players").bestPlayers).toBe("4+");
+    expect(summary("bestwith", "nonsense").bestPlayers).toBe("");
+    expect(summary("other", "Best with 3 players").bestPlayers).toBe("");
   });
 
   test("player lists become ranges", () => {
@@ -490,10 +489,11 @@ describe("shaping thing replies", () => {
   });
 
   test("Not Ranked and missing statistics become zero", () => {
-    expect(LEGACY).toMatchObject({ rank: 0, weight: 0, weightCount: 0, minAge: 0, playingTime: 0, image: "", rating: 7.9, ratingCount: 85 });
-    expect(LEGACY.thumbnail).toContain("thumb-900004");
+    expect(LEGACY).toMatchObject({ rank: 0, weight: 0, minAge: 0, minPlayTime: 0, maxPlayTime: 0, rating: 7.9, ratingCount: 85 });
+    // The cover falls back to the thumbnail when there is no full image.
+    expect(LEGACY.image).toContain("thumb-900004");
     const bare = parseThings('<items><item type="boardgame" id="9"><name type="primary" value="Bare"/></item></items>')[0];
-    expect(bare).toMatchObject({ rating: 0, ratingCount: 0, rank: 0, weight: 0, expansions: 0, description: "", image: "" });
+    expect(bare).toMatchObject({ rating: 0, ratingCount: 0, rank: 0, weight: 0, expansionCount: 0, description: "", image: "" });
     const ranked = (value) =>
       parseThings(`<items><item id="9"><name type="primary" value="R"/><statistics><ratings><ranks><rank type="subtype" name="boardgame" value="${value}"/><rank type="family" name="strategygames" value="3"/></ranks></ratings></statistics></item></items>`)[0].rank;
     expect(ranked("1234")).toBe(1234);
@@ -506,7 +506,7 @@ describe("shaping thing replies", () => {
     const game = parseThings(
       '<items><item id="9"><name type="primary" value="G"/><link type="boardgameexpansion" id="1" value="A"/><link type="boardgameexpansion" id="2" value="B" inbound="true"/></item></items>',
     )[0];
-    expect(game.expansions).toBe(1);
+    expect(game.expansionCount).toBe(1);
   });
 
   test("missing and null fields never throw", () => {
@@ -527,8 +527,10 @@ describe("shaping thing replies", () => {
     const withImages = (image, thumbnail) =>
       parseThings(`<items><item id="4"><name type="primary" value="I"/><image>${image}</image><thumbnail>${thumbnail}</thumbnail></item></items>`)[0];
     const evil = withImages("https://evil.test/x.jpg", "http://cf.geekdo-images.com/t.jpg");
-    expect([evil.image, evil.thumbnail]).toEqual(["", ""]);
-    expect(withImages("https://cf.geekdo-images.com/a.jpg", "javascript:alert(1)")).toMatchObject({ image: "https://cf.geekdo-images.com/a.jpg", thumbnail: "" });
+    expect(evil.image).toBe("");
+    expect(withImages("https://cf.geekdo-images.com/a.jpg", "javascript:alert(1)").image).toBe("https://cf.geekdo-images.com/a.jpg");
+    expect(withImages("", "https://cf.geekdo-images.com/t.jpg").image).toBe("https://cf.geekdo-images.com/t.jpg");
+    expect(withImages("https://evil.test/a.jpg", "https://cf.geekdo-images.com/t.jpg").image).toBe("https://cf.geekdo-images.com/t.jpg");
   });
 
   test("lists are capped", () => {
@@ -795,7 +797,7 @@ describe("rendering", () => {
     const nothing = buildPanel({ game: { ...LEGACY, rating: 0, ratingCount: 0 } });
     expect(nothing).not.toContain("board-games-scores");
     expect(buildPanel({ game: { ...STARFALL, ratingCount: 0 } })).not.toContain("ratings<");
-    expect(buildPanel({ game: { ...STARFALL, expansions: 1 } })).toContain("1 expansion on BGG");
+    expect(buildPanel({ game: { ...STARFALL, expansionCount: 1 } })).toContain("1 expansion on BGG");
   });
 
   test("works with minimal data and always credits BGG", () => {
@@ -817,14 +819,13 @@ describe("rendering", () => {
       id: '1"><script>alert(1)</script>',
       name: '<script>alert("n")</script>',
       description: "<b>bold</b> & <i>x</i>",
-      image: "javascript:alert(1)",
-      thumbnail: 'https://cf.geekdo-images.com/x.jpg"onerror="alert(1)',
+      image: "https://cf.geekdo-images.com/x.jpg\"onerror=\"alert(1)",
       designers: ["<u>d</u>"],
       publishers: ['"><svg onload=alert(1)>'],
       categories: ["<b>c</b>"],
       mechanics: ["<i>m</i>"],
-      bestWith: "<s>3</s>",
-      recommendedWith: "<s>4</s>",
+      bestPlayers: "<s>3</s>",
+      recommendedPlayers: "<s>4</s>",
     };
     const html = buildPanel({ game: evil, signProxy });
     for (const forbidden of ["<script", "<b>", "<i>", "<u>", "<s>", "<svg", "javascript:", "boardgame/1\"", 'onerror="alert']) {
@@ -839,20 +840,19 @@ describe("rendering", () => {
   });
 
   test("players and playing time read naturally", () => {
-    const players = (minPlayers, maxPlayers, extra = {}) => playersText({ minPlayers, maxPlayers, bestWith: "", recommendedWith: "", ...extra });
+    const players = (minPlayers, maxPlayers, extra = {}) => playersText({ minPlayers, maxPlayers, bestPlayers: "", recommendedPlayers: "", ...extra });
     expect(players(1, 4)).toBe("1–4");
     expect(players(2, 2)).toBe("2");
     expect(players(0, 4)).toBe("4");
     expect(players(0, 0)).toBe("");
-    expect(players(2, 5, { bestWith: "4" })).toBe("2–5 · Best with 4");
-    expect(players(2, 5, { recommendedWith: "3–5" })).toBe("2–5 · Recommended 3–5");
-    expect(players(0, 0, { bestWith: "3" })).toBe("Best with 3");
-    const time = (minPlayTime, maxPlayTime, playingTime = 0) => playTimeText({ minPlayTime, maxPlayTime, playingTime });
+    expect(players(2, 5, { bestPlayers: "4" })).toBe("2–5 · Best with 4");
+    expect(players(2, 5, { recommendedPlayers: "3–5" })).toBe("2–5 · Recommended 3–5");
+    expect(players(0, 0, { bestPlayers: "3" })).toBe("Best with 3");
+    const time = (minPlayTime, maxPlayTime) => playTimeText({ minPlayTime, maxPlayTime });
     expect(time(60, 120)).toBe("60–120 min");
     expect(time(30, 30)).toBe("30 min");
-    expect(time(0, 0, 90)).toBe("90 min");
     expect(time(0, 45)).toBe("45 min");
-    expect(time(0, 0, 0)).toBe("");
+    expect(time(0, 0)).toBe("");
   });
 
   test("summaries cut at a sentence after 40 %, else at a word with an ellipsis", () => {
@@ -949,13 +949,13 @@ describe("the slot", () => {
   test("the API base and the request window come from the environment", async () => {
     await withEnv({ DEGOOG_BGG_API_BASE: "http://mock:4469/xmlapi2", DEGOOG_SLOT_TIMEOUT_MS: undefined }, () => {
       const slot = new BoardGamesSlot();
-      expect(slot.apiBase).toBe("http://mock:4469/xmlapi2");
+      expect(slot.sources.api.base).toBe("http://mock:4469/xmlapi2");
       expect(slot.startWindowMs).toBe(7000);
     });
     await withEnv({ DEGOOG_BGG_API_BASE: undefined, DEGOOG_SLOT_TIMEOUT_MS: "5000" }, () => {
       const slot = new BoardGamesSlot();
-      expect(slot.apiBase).toBe(DEFAULT_API_BASE);
-      expect(slot.startWindowMs).toBe(2000);
+      expect(slot.sources.api.base).toBe(DEFAULT_API_BASE);
+      expect(slot.startWindowMs).toBe(3500);
     });
     await withEnv({ DEGOOG_SLOT_TIMEOUT_MS: "1200" }, () => expect(new BoardGamesSlot().startWindowMs).toBe(1000));
   });
@@ -974,10 +974,10 @@ describe("the slot", () => {
 
   test("the environment token is used when the setting is empty, and the setting wins", async () => {
     await withEnv({ BGG_API_TOKEN: "env-token-123" }, async () => {
-      expect(make({}).apiToken).toBe("env-token-123");
-      expect(make({ apiToken: "  " }).apiToken).toBe("env-token-123");
-      expect(make({ apiToken: "ui-token-456" }).apiToken).toBe("ui-token-456");
-      expect(make({ apiToken: "Bearer ui-token-456" }).apiToken).toBe("ui-token-456");
+      expect(make({}).sources.api.token).toBe("env-token-123");
+      expect(make({ apiToken: "  " }).sources.api.token).toBe("env-token-123");
+      expect(make({ apiToken: "ui-token-456" }).sources.api.token).toBe("ui-token-456");
+      expect(make({ apiToken: "Bearer ui-token-456" }).sources.api.token).toBe("ui-token-456");
       const context = makeContext({ token: "ui-token-456" });
       await make({ apiToken: "ui-token-456" }).execute("starfall", context);
       expect(context.calls[0].init.headers.Authorization).toBe("Bearer ui-token-456");
@@ -986,11 +986,11 @@ describe("the slot", () => {
 
   test("settings accept strings and booleans, and the daily limit falls back to 300", () => {
     const slot = make({ apiToken: TOKEN, requireBoardGameWord: true, showDescription: "false", dailyRequestLimit: "25" });
-    expect([slot.requireBoardGameWord, slot.showDescription, slot.budget.cap]).toEqual([true, false, 25]);
+    expect([slot.requireBoardGameWord, slot.showDescription, slot.sources.api.budget.cap]).toEqual([true, false, 25]);
     const defaults = make({ apiToken: TOKEN });
-    expect([defaults.requireBoardGameWord, defaults.showDescription, defaults.budget.cap]).toEqual([false, true, 300]);
-    expect(make({ apiToken: TOKEN, dailyRequestLimit: "0" }).budget.cap).toBe(0);
-    for (const bad of ["abc", "-4", ""]) expect(make({ apiToken: TOKEN, dailyRequestLimit: bad }).budget.cap).toBe(300);
+    expect([defaults.requireBoardGameWord, defaults.showDescription, defaults.sources.api.budget.cap]).toEqual([false, true, 300]);
+    expect(make({ apiToken: TOKEN, dailyRequestLimit: "0" }).sources.api.budget.cap).toBe(0);
+    for (const bad of ["abc", "-4", ""]) expect(make({ apiToken: TOKEN, dailyRequestLimit: bad }).sources.api.budget.cap).toBe(300);
   });
 
   test("the first query costs one search and one thing request, and renders the panel", async () => {
@@ -1000,7 +1000,7 @@ describe("the slot", () => {
     const out = await slot.execute("starfall", context);
     expect(kinds(context)).toEqual(["search", "thing"]);
     expect(out.title).toBe("Starfall");
-    expect(out.html).toStartWith('<div class="x"><div class="board-games-card">');
+    expect(out.html).toStartWith('<div class="x"><div class="board-games-card" data-source="bgg-api">');
     for (const part of ["BGG rating", "BGG rank", "#12", "Weight / 5", "Powered by BGG", "boardgamegeek.com/boardgame/900001"]) expect(out.html).toContain(part);
     const [search, thing] = context.calls;
     expect(search.url).toBe("https://bgg.test/xmlapi2/search?query=starfall&type=boardgame");
@@ -1011,7 +1011,7 @@ describe("the slot", () => {
       expect(call.init.headers["User-Agent"]).toContain("degoog-board-games/1.0");
       expect(call.url).not.toContain(TOKEN);
     }
-    expect(slot.budget.used).toBe(2);
+    expect(slot.sources.api.budget.used).toBe(2);
   });
 
   test("the same game is then served from cache with no requests", async () => {
@@ -1053,7 +1053,7 @@ describe("the slot", () => {
     const context = makeContext();
     expect(await slot.execute("starfield", context)).toEqual(EMPTY);
     expect(kinds(context)).toEqual(["search", "thing"]);
-    expect(slot.paused).toBe(false);
+    expect(slot.sources.api.upstream.paused).toBe(false);
   });
 
   test("an unconfident match shows nothing unless the query names board games", async () => {
@@ -1097,8 +1097,8 @@ describe("the slot", () => {
       const context = makeContext({ respond: () => new Response(`no ${TOKEN}`, { status }) });
       const lines = await capture(async () => expect(await slot.execute("starfall", context)).toEqual(EMPTY));
       expect(kinds(context)).toEqual(["search"]);
-      expect(slot.paused).toBe(true);
-      expect(slot._pausedUntil - slot.now()).toBeGreaterThan(29 * 60_000);
+      expect(slot.sources.api.upstream.paused).toBe(true);
+      expect(slot.sources.api.upstream.pausedUntil - slot.now()).toBeGreaterThan(29 * 60_000);
       expect(lines).toHaveLength(1);
       expect(lines[0]).toContain("BGG rejected the API token or blocked the request");
       for (const secretish of [TOKEN, "http", "bgg.test", "Bearer"]) expect(lines[0]).not.toContain(secretish);
@@ -1113,12 +1113,12 @@ describe("the slot", () => {
     const slot = make();
     const context = makeContext({ respond: () => new Response("<!DOCTYPE html><html><title>Just a moment...</title></html>", { status: 200, headers: { "content-type": "text/html" } }) });
     const lines = await capture(async () => expect(await slot.execute("starfall", context)).toEqual(EMPTY));
-    expect(slot._pausedUntil - slot.now()).toBeGreaterThan(29 * 60_000);
+    expect(slot.sources.api.upstream.pausedUntil - slot.now()).toBeGreaterThan(29 * 60_000);
     expect(lines).toHaveLength(1);
     expect(lines.join("")).not.toContain("http");
     const challenge = make();
     await capture(() => challenge.execute("starfall", makeContext({ respond: () => new Response("<html>x</html>", { status: 403 }) })));
-    expect(challenge.paused).toBe(true);
+    expect(challenge.sources.api.upstream.paused).toBe(true);
   });
 
   test("429 pauses for the retry-after time, ten minutes by default, an hour at most", async () => {
@@ -1128,18 +1128,18 @@ describe("the slot", () => {
     const context = makeContext({ respond: () => new Response("slow", { status: 429, headers: { "retry-after": "30" } }) });
     await capture(async () => expect(await slot.execute("starfall", context)).toEqual(EMPTY));
     expect(kinds(context)).toEqual(["search"]);
-    expect(slot.paused).toBe(true);
+    expect(slot.sources.api.upstream.paused).toBe(true);
     now += 29_000;
-    expect(slot.paused).toBe(true);
+    expect(slot.sources.api.upstream.paused).toBe(true);
     now += 2_000;
-    expect(slot.paused).toBe(false);
+    expect(slot.sources.api.upstream.paused).toBe(false);
     const fallback = make();
     await capture(() => fallback.execute("starfall", makeContext({ respond: () => new Response("slow", { status: 429 }) })));
-    expect(fallback._pausedUntil - fallback.now()).toBeGreaterThan(9 * 60_000);
-    expect(fallback._pausedUntil - fallback.now()).toBeLessThanOrEqual(10 * 60_000);
+    expect(fallback.sources.api.upstream.pausedUntil - fallback.now()).toBeGreaterThan(9 * 60_000);
+    expect(fallback.sources.api.upstream.pausedUntil - fallback.now()).toBeLessThanOrEqual(10 * 60_000);
     const long = make();
     await capture(() => long.execute("starfall", makeContext({ respond: () => new Response("slow", { status: 429, headers: { "retry-after": "999999" } }) })));
-    expect(long._pausedUntil - long.now()).toBeLessThanOrEqual(3_600_000);
+    expect(long.sources.api.upstream.pausedUntil - long.now()).toBeLessThanOrEqual(3_600_000);
   });
 
   test("server errors, 202 and network failures pause for a minute and never throw or leak the token", async () => {
@@ -1153,8 +1153,8 @@ describe("the slot", () => {
       const slot = make();
       const context = makeContext({ respond });
       const lines = await capture(async () => expect(await slot.execute("starfall", context)).toEqual(EMPTY));
-      expect(slot.paused).toBe(true);
-      expect(slot._pausedUntil - slot.now()).toBeLessThanOrEqual(60_000);
+      expect(slot.sources.api.upstream.paused).toBe(true);
+      expect(slot.sources.api.upstream.pausedUntil - slot.now()).toBeLessThanOrEqual(60_000);
       expect(lines).toHaveLength(1);
       expect(lines.join("")).not.toContain(TOKEN);
       expect(lines.join("")).not.toContain("http");
@@ -1180,7 +1180,7 @@ describe("the slot", () => {
     const slot = make();
     const context = makeContext({ search: "hello there" });
     expect(await slot.execute("starfall", context)).toEqual(EMPTY);
-    expect(slot.paused).toBe(false);
+    expect(slot.sources.api.upstream.paused).toBe(false);
     await slot.execute("starfall", context);
     expect(kinds(context)).toEqual(["search", "search"]);
     const broken = make();
@@ -1191,7 +1191,7 @@ describe("the slot", () => {
     const html = make();
     const htmlContext = makeContext({ respond: (kind) => (kind === "thing" ? xmlResponse("<items><oops></items>") : undefined) });
     expect(await html.execute("starfall", htmlContext)).toEqual(EMPTY);
-    expect(html.paused).toBe(false);
+    expect(html.sources.api.upstream.paused).toBe(false);
   });
 
   test("the daily limit stops requests, is kept on disk, and starts again at UTC midnight", async () => {
@@ -1200,7 +1200,7 @@ describe("the slot", () => {
     const build = () => {
       const slot = make({ apiToken: TOKEN, dailyRequestLimit: "2" });
       slot.now = () => now;
-      slot.budget = new Budget({ file, cap: 2, now: () => now });
+      slot.sources.api.budget = new Budget({ file, cap: 2, now: () => now });
       return slot;
     };
     let now = midnight;
@@ -1225,12 +1225,12 @@ describe("the slot", () => {
 
   test("running out of requests mid-way pauses for at most an hour with one warning", async () => {
     const slot = make({ apiToken: TOKEN, dailyRequestLimit: "1" });
-    slot.budget = new Budget({ file: "", cap: 1, now: () => slot.now() });
+    slot.sources.api.budget = new Budget({ file: "", cap: 1, now: () => slot.now() });
     const context = makeContext();
     const lines = await capture(async () => expect(await slot.execute("starfall", context)).toEqual(EMPTY));
     expect(kinds(context)).toEqual(["search"]);
-    expect(slot.paused).toBe(true);
-    expect(slot._pausedUntil - slot.now()).toBeLessThanOrEqual(3_600_000);
+    expect(slot.sources.api.upstream.paused).toBe(true);
+    expect(slot.sources.api.upstream.pausedUntil - slot.now()).toBeLessThanOrEqual(3_600_000);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain("daily BGG request limit");
     expect(slot.trigger("starfall")).toBe(false);
@@ -1240,8 +1240,8 @@ describe("the slot", () => {
     const slot = make({ apiToken: TOKEN, dailyRequestLimit: "0" });
     const context = makeContext();
     for (const query of ["starfall", "starfall duel", "starfall legacy board game"]) await slot.execute(query, context);
-    expect(slot.budget.exhausted).toBe(false);
-    expect(slot.budget.used).toBeGreaterThan(0);
+    expect(slot.sources.api.budget.exhausted).toBe(false);
+    expect(slot.sources.api.budget.used).toBeGreaterThan(0);
   });
 
   test("requests keep at least a second apart, and are skipped when the wait does not fit in the slot time", async () => {
@@ -1269,8 +1269,8 @@ describe("the slot", () => {
     const tightContext = makeContext();
     expect(await tight.execute("starfall", tightContext)).toEqual(EMPTY);
     expect(kinds(tightContext)).toEqual(["search"]);
-    expect(tight.paused).toBe(false);
-    expect(tight.budget.used).toBe(1);
+    expect(tight.sources.api.upstream.paused).toBe(false);
+    expect(tight.sources.api.budget.used).toBe(1);
     clock += 5000;
     expect((await tight.execute("starfall", tightContext)).title).toBe("Starfall");
     expect(kinds(tightContext)).toEqual(["search", "thing"]);
@@ -1311,10 +1311,10 @@ describe("the slot", () => {
       },
     };
     await slot.execute("starfall", context);
-    expect(Object.keys(stores).sort()).toEqual(["ext:board-games:search", "ext:board-games:thing"]);
-    expect(lifetimes).toEqual({ "ext:board-games:search": 24 * 3_600_000, "ext:board-games:thing": 7 * 24 * 3_600_000 });
-    expect([...stores["ext:board-games:search"].values()]).toEqual([{ ids: ["900001", "900003", "900004"] }]);
-    expect([...stores["ext:board-games:thing"].keys()].sort()).toEqual(["900001", "900003", "900004"]);
+    expect(Object.keys(stores).sort()).toEqual(["ext:board-games:bgg-api:details", "ext:board-games:bgg-api:search"]);
+    expect(lifetimes).toEqual({ "ext:board-games:bgg-api:search": 24 * 3_600_000, "ext:board-games:bgg-api:details": 7 * 24 * 3_600_000 });
+    expect([...stores["ext:board-games:bgg-api:search"].values()]).toEqual([{ ids: ["900001", "900003", "900004"] }]);
+    expect([...stores["ext:board-games:bgg-api:details"].keys()].sort()).toEqual(["900001", "900003", "900004"]);
     expect(base.calls).toHaveLength(2);
     await slot.execute("starfall", context);
     expect(base.calls).toHaveLength(2);

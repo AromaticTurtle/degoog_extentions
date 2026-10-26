@@ -1,0 +1,95 @@
+{
+  "entities": {
+    "Q900000001": {
+      "type": "item",
+      "id": "Q900000001",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Starfall"
+        }
+      },
+      "claims": {
+        "P2339": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P2339",
+              "hash": "0000000000000000000000000000000000000000",
+              "datavalue": {
+                "value": "900001",
+                "type": "string"
+              },
+              "datatype": "external-id"
+            },
+            "type": "statement",
+            "id": "Q900000001$1",
+            "rank": "normal"
+          }
+        ]
+      }
+    },
+    "Q900000002": {
+      "type": "item",
+      "id": "Q900000002",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Starfall Duel"
+        }
+      },
+      "claims": {
+        "P2339": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P2339",
+              "hash": "0000000000000000000000000000000000000000",
+              "datavalue": {
+                "value": "900003",
+                "type": "string"
+              },
+              "datatype": "external-id"
+            },
+            "type": "statement",
+            "id": "Q900000002$1",
+            "rank": "normal"
+          }
+        ]
+      }
+    },
+    "Q900000003": {
+      "type": "item",
+      "id": "Q900000003",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Starfall"
+        }
+      },
+      "claims": {
+        "P31": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P31",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 7725634,
+                  "id": "Q7725634"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "type": "statement",
+            "id": "Q900000003$2",
+            "rank": "normal"
+          }
+        ]
+      }
+    }
+  },
+  "success": 1
+}

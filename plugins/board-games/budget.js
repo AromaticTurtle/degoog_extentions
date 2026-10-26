@@ -1,12 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+// One count per source, so a limit on one never uses up another.
 export const usageFile = (dataDir) => process.env.DEGOOG_BGG_USAGE_FILE || join(dataDir, "bgg", "usage.json");
+export const recommendGamesUsageFile = (dataDir) => process.env.DEGOOG_RGAMES_USAGE_FILE || join(dataDir, "bgg", "usage-recommend-games.json");
+export const geekdoUsageFile = (dataDir) => process.env.DEGOOG_GEEKDO_USAGE_FILE || join(dataDir, "bgg", "usage-geekdo.json");
 
 const DAY_MS = 86_400_000;
 const dayOf = (timestamp) => new Date(timestamp).toISOString().slice(0, 10);
 
-// Counts BGG requests per UTC day and keeps the count on disk, so a restart does not reset it.
+// Counts a source's requests per UTC day and keeps the count on disk, so a restart does not reset it.
 export class Budget {
   constructor({ file = "", cap = 300, now = Date.now } = {}) {
     this.file = file;

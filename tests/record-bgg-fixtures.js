@@ -4,6 +4,8 @@
 // The token is read from the environment and sent only in a header. A file is refused if its content contains the token.
 // Note: the replies are BoardGameGeek's data. Keep recorded files for local testing; do not publish them
 // (BGG's terms do not allow redistributing its data), and run `git status` before committing.
+// The same goes for anything recorded from recommend.games or BGG's website API (api.geekdo.com): that data is
+// BGG-derived too, so those fixtures (tests/fixtures/recommend-games-*.json, geekdo-*.json) must not be committed either.
 import { writeFileSync } from "node:fs";
 import { DEFAULT_API_BASE, buildHeaders, buildSearchUrl, buildThingUrl, normalizeToken } from "../plugins/board-games/request.js";
 import { rankCandidates } from "../plugins/board-games/match.js";

@@ -82,4 +82,5 @@ export const readText = async (response, maxChars) => {
 };
 
 // A Cloudflare challenge or any other HTML page where XML was expected.
-export const looksBlocked = (text) => /^\s*<!doctype html|^\s*<html[\s>]/i.test(text) || /just a moment/i.test(text.slice(0, 3000));
+export const looksBlocked = (text) =>
+  /^\s*<!doctype html|^\s*<html[\s>]/i.test(text) || (/^\s*</.test(text) && /<title>\s*just a moment/i.test(text.slice(0, 3000)));

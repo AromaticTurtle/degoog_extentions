@@ -1,0 +1,207 @@
+{
+  "count": 5,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "bgg_id": 900001,
+      "name": "Starfall",
+      "alt_name": [
+        "Sternenfall",
+        "Chute d'étoiles",
+        "Caída estelar"
+      ],
+      "year": 2019,
+      "description": "Starfall is a cooperative game for one to four players set on a failing orbital station. Each round you plan a route through the debris field, spend energy tokens to repair the hull, and race to light the beacon before the last shuttle leaves.\n\nThe game plays in about an hour and a half and scales well with the number of players. It includes a solo mode against a rival AI crew.\n\nThis text is invented for tests.\n\n—description from the publisher",
+      "min_players": 1,
+      "max_players": 4,
+      "min_players_rec": 1,
+      "max_players_rec": 4,
+      "min_players_best": 2,
+      "max_players_best": 3,
+      "min_age": 12,
+      "min_time": 60,
+      "max_time": 120,
+      "cooperative": true,
+      "bgg_rank": 12,
+      "num_votes": 24310,
+      "avg_rating": 8.52141,
+      "bayes_rating": 8.1066,
+      "complexity": 3.9132,
+      "designer_name": [
+        "Ada Quill",
+        "Bo Marlowe"
+      ],
+      "artist_name": [
+        "Cy Dunmore"
+      ],
+      "category_name": [
+        "Economic",
+        "Science Fiction",
+        "Space Exploration"
+      ],
+      "mechanic_name": [
+        "Cooperative Game",
+        "Hand Management",
+        "Route Planning",
+        "Solo / Solitaire Game"
+      ],
+      "game_type_name": [
+        "Strategy Game"
+      ],
+      "image_url": [
+        "https://cf.geekdo-images.com/placeholder-starfall/original/img/full-900001.jpg",
+        "https://cf.geekdo-images.com/placeholder-starfall/small/img/small-900001.jpg"
+      ],
+      "url": "https://boardgamegeek.com/boardgame/900001",
+      "wikidata_id": [
+        "Q900000001"
+      ]
+    },
+    {
+      "bgg_id": 900002,
+      "name": "Starfall: Nebula Expansion",
+      "alt_name": [],
+      "year": 2020,
+      "description": "An expansion for Starfall. Invented text for tests.",
+      "min_players": 1,
+      "max_players": 5,
+      "min_players_rec": 0,
+      "max_players_rec": 0,
+      "min_players_best": 0,
+      "max_players_best": 0,
+      "min_age": 12,
+      "min_time": 30,
+      "max_time": 30,
+      "cooperative": false,
+      "bgg_rank": null,
+      "num_votes": 9000,
+      "avg_rating": 8.1,
+      "bayes_rating": 0.0,
+      "complexity": 3.2,
+      "designer_name": [
+        "Ada Quill"
+      ],
+      "artist_name": [],
+      "category_name": [
+        "Expansion for Base-game",
+        "Science Fiction"
+      ],
+      "mechanic_name": [
+        "Hand Management"
+      ],
+      "game_type_name": [],
+      "image_url": [
+        "https://cf.geekdo-images.com/placeholder-starfall/original/img/full-900002.jpg",
+        "https://cf.geekdo-images.com/placeholder-starfall/small/img/small-900002.jpg"
+      ],
+      "url": "https://boardgamegeek.com/boardgame/900002",
+      "wikidata_id": []
+    },
+    {
+      "bgg_id": 900003,
+      "name": "Starfall Duel",
+      "alt_name": [
+        "Duel of Starfall"
+      ],
+      "year": 2021,
+      "description": "A fast two player card duel in the Starfall universe. Invented text for tests.",
+      "min_players": 2,
+      "max_players": 2,
+      "min_players_rec": 2,
+      "max_players_rec": 2,
+      "min_players_best": 2,
+      "max_players_best": 2,
+      "min_age": 10,
+      "min_time": 20,
+      "max_time": 30,
+      "cooperative": false,
+      "bgg_rank": 640,
+      "num_votes": 3200,
+      "avg_rating": 7.1,
+      "bayes_rating": 6.6,
+      "complexity": 1.8,
+      "designer_name": [
+        "Ada Quill"
+      ],
+      "artist_name": [],
+      "category_name": [
+        "Card Game"
+      ],
+      "mechanic_name": [
+        "Hand Management"
+      ],
+      "game_type_name": [],
+      "image_url": [
+        "https://cf.geekdo-images.com/placeholder-starfall/original/img/full-900003.jpg",
+        "https://cf.geekdo-images.com/placeholder-starfall/small/img/small-900003.jpg"
+      ],
+      "url": "https://boardgamegeek.com/boardgame/900003",
+      "wikidata_id": [
+        "Q900000002"
+      ]
+    },
+    {
+      "bgg_id": 900004,
+      "name": "Starfall Legacy",
+      "alt_name": [],
+      "year": 2023,
+      "description": "A campaign game that has just been released. Invented text for tests.",
+      "min_players": 1,
+      "max_players": 5,
+      "min_players_rec": 0,
+      "max_players_rec": 0,
+      "min_players_best": 0,
+      "max_players_best": 0,
+      "min_age": null,
+      "min_time": 0,
+      "max_time": 0,
+      "cooperative": false,
+      "bgg_rank": null,
+      "num_votes": 85,
+      "avg_rating": 7.9,
+      "bayes_rating": 0.0,
+      "complexity": null,
+      "designer_name": [],
+      "artist_name": [],
+      "category_name": [
+        "Economic"
+      ],
+      "mechanic_name": [],
+      "game_type_name": [],
+      "image_url": [],
+      "url": "https://boardgamegeek.com/boardgame/900004",
+      "wikidata_id": []
+    },
+    {
+      "bgg_id": 900005,
+      "name": "Starfield Station",
+      "alt_name": [],
+      "year": 2018,
+      "description": "An unrelated game. Invented text for tests.",
+      "min_players": 2,
+      "max_players": 4,
+      "min_players_rec": 0,
+      "max_players_rec": 0,
+      "min_players_best": 0,
+      "max_players_best": 0,
+      "min_age": 8,
+      "min_time": 45,
+      "max_time": 60,
+      "cooperative": false,
+      "bgg_rank": 2100,
+      "num_votes": 1800,
+      "avg_rating": 6.8,
+      "bayes_rating": 0.0,
+      "complexity": 2.1,
+      "designer_name": [],
+      "artist_name": [],
+      "category_name": [],
+      "mechanic_name": [],
+      "game_type_name": [],
+      "image_url": [],
+      "url": "https://boardgamegeek.com/boardgame/900005",
+      "wikidata_id": []
+    }
+  ]
+}

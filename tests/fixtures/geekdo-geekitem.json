@@ -1,0 +1,139 @@
+{
+  "item": {
+    "id": 900001,
+    "objectid": 900001,
+    "objecttype": "thing",
+    "type": "things",
+    "label": "Board Game",
+    "subtype": "boardgame",
+    "subtypes": [
+      "boardgame"
+    ],
+    "name": "Starfall",
+    "primaryname": {
+      "name": "Starfall",
+      "nameid": "1",
+      "sortindex": "1",
+      "primaryname": true
+    },
+    "alternatename": null,
+    "alternatenames": [
+      {
+        "name": "Sternenfall",
+        "nameid": "2",
+        "sortindex": "1"
+      },
+      {
+        "name": "Chute d'étoiles",
+        "nameid": "3",
+        "sortindex": "1"
+      }
+    ],
+    "alternatenamescount": 2,
+    "yearpublished": "2019",
+    "minplayers": "1",
+    "maxplayers": "4",
+    "minplaytime": "60",
+    "maxplaytime": "120",
+    "minage": "12",
+    "short_description": "Light the beacon before the last shuttle leaves.",
+    "description": "<p>Starfall is a cooperative game for one to four players set on a failing orbital station. Each round you plan a route through the debris field, spend energy tokens to repair the hull, and race to light the &ldquo;beacon&rdquo; before the last shuttle leaves.<br/><br/>The game plays in about an hour and a half &mdash; and it&rsquo;s friendly to newcomers &amp; veterans alike.</p><p>This text is invented for tests.&#10;&#10;</p>",
+    "canonical_link": "https://boardgamegeek.com/boardgame/900001/starfall",
+    "href": "/boardgame/900001/starfall",
+    "itemstate": "approved",
+    "imageurl": "https://cf.geekdo-images.com/placeholder-starfall/image/img/image-900001.jpg",
+    "imageurl@2x": "https://cf.geekdo-images.com/placeholder-starfall/image/img/image-900001-2x.jpg",
+    "images": {
+      "micro": "https://cf.geekdo-images.com/placeholder-starfall/micro/img/micro-900001.jpg",
+      "original": "https://cf.geekdo-images.com/placeholder-starfall/original/img/original-900001.jpg",
+      "previewthumb": "https://cf.geekdo-images.com/placeholder-starfall/previewthumb/img/previewthumb-900001.jpg",
+      "square": "https://cf.geekdo-images.com/placeholder-starfall/square/img/square-900001.jpg",
+      "square200": "https://cf.geekdo-images.com/placeholder-starfall/square200/img/square200-900001.jpg",
+      "tallthumb": "https://cf.geekdo-images.com/placeholder-starfall/tallthumb/img/tallthumb-900001.jpg",
+      "thumb": "https://cf.geekdo-images.com/placeholder-starfall/thumb/img/thumb-900001.jpg"
+    },
+    "links": {
+      "boardgamedesigner": [
+        {
+          "name": "Ada Quill",
+          "sortindex": "0",
+          "objecttype": "property",
+          "objectid": "5001",
+          "primarylink": 1
+        },
+        {
+          "name": "Bo Marlowe",
+          "sortindex": "0",
+          "objecttype": "property",
+          "objectid": "5002",
+          "primarylink": 1
+        }
+      ],
+      "boardgamepublisher": [
+        {
+          "name": "Lantern & Oak Games",
+          "objectid": "7001"
+        },
+        {
+          "name": "Harbor Lights Publishing",
+          "objectid": "7002"
+        }
+      ],
+      "boardgamecategory": [
+        {
+          "name": "Economic",
+          "objectid": "1021"
+        },
+        {
+          "name": "Science Fiction",
+          "objectid": "1016"
+        },
+        {
+          "name": "Space Exploration",
+          "objectid": "1050"
+        }
+      ],
+      "boardgamemechanic": [
+        {
+          "name": "Cooperative Game",
+          "objectid": "2040"
+        },
+        {
+          "name": "Hand Management",
+          "objectid": "2041"
+        },
+        {
+          "name": "Route Planning",
+          "objectid": "2042"
+        }
+      ],
+      "boardgameexpansion": [
+        {
+          "name": "Starfall: Nebula Expansion",
+          "objectid": "900002"
+        },
+        {
+          "name": "Starfall: Escape Pods",
+          "objectid": "900007"
+        }
+      ],
+      "boardgameartist": [
+        {
+          "name": "Cy Dunmore",
+          "objectid": "6001"
+        }
+      ],
+      "boardgamefamily": [
+        {
+          "name": "Orbital Station Series",
+          "objectid": "9001"
+        }
+      ]
+    },
+    "linkcounts": {
+      "boardgamedesigner": 2
+    },
+    "website": "",
+    "wiki": ""
+  }
+}

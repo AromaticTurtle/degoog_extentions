@@ -1,0 +1,37 @@
+{
+  "batchcomplete": "",
+  "query": {
+    "searchinfo": {
+      "totalhits": 3
+    },
+    "search": [
+      {
+        "ns": 0,
+        "title": "Q900000002",
+        "pageid": 9000002,
+        "size": 1200,
+        "wordcount": 12,
+        "snippet": "",
+        "timestamp": "2024-01-01T00:00:00Z"
+      },
+      {
+        "ns": 0,
+        "title": "Q900000001",
+        "pageid": 9000001,
+        "size": 1200,
+        "wordcount": 12,
+        "snippet": "",
+        "timestamp": "2024-01-01T00:00:00Z"
+      },
+      {
+        "ns": 0,
+        "title": "Q900000003",
+        "pageid": 9000003,
+        "size": 1200,
+        "wordcount": 12,
+        "snippet": "",
+        "timestamp": "2024-01-01T00:00:00Z"
+      }
+    ]
+  }
+}

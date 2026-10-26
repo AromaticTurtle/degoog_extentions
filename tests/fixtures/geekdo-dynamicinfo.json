@@ -1,0 +1,64 @@
+{
+  "item": {
+    "rankinfo": [
+      {
+        "prettyname": "Board Game Rank",
+        "shortprettyname": "Overall Rank",
+        "veryshortprettyname": "Overall",
+        "subdomain": null,
+        "rankobjecttype": "subtype",
+        "rankobjectid": 1,
+        "browsesubtype": "boardgame",
+        "rank": "12",
+        "baverage": "8.1066"
+      },
+      {
+        "prettyname": "Strategy Game Rank",
+        "shortprettyname": "Strategy Rank",
+        "veryshortprettyname": "Strategy",
+        "subdomain": "strategygames",
+        "rankobjecttype": "family",
+        "rankobjectid": 5497,
+        "browsesubtype": "strategygames",
+        "rank": "9",
+        "baverage": "8.1301"
+      }
+    ],
+    "polls": {
+      "userplayers": {
+        "best": [
+          {
+            "min": 2,
+            "max": 3
+          }
+        ],
+        "recommended": [
+          {
+            "min": 1,
+            "max": 4
+          }
+        ],
+        "totalvotes": "1380"
+      },
+      "playerage": "12+",
+      "boardgameweight": {
+        "averageweight": 3.9132,
+        "votes": "4210"
+      }
+    },
+    "stats": {
+      "usersrated": "24310",
+      "average": "8.52141",
+      "baverage": "8.1066",
+      "stddev": "1.4",
+      "avgweight": "3.9132",
+      "numweights": "4210",
+      "numowned": "61000",
+      "numwish": "15000",
+      "numcomments": "5200"
+    },
+    "relatedcounts": {
+      "expansions": 2
+    }
+  }
+}
