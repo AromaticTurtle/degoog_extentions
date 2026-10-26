@@ -12,6 +12,13 @@
       "minDegoogVersion": "1.1.0"
     },
     {
+      "path": "engines/mojeek",
+      "name": "Mojeek",
+      "description": "Mojeek web search without an API key. Passes Mojeek's small proof-of-work check once a month, then each search is one request. Bounded, paused after blocks.",
+      "version": "1.0.0",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
       "path": "engines/mwmbl",
       "name": "Mwmbl",
       "description": "Mwmbl, the non-profit community search engine, on the web tab. Works without a key. One request per search; later pages come from a 10 minute cache. Tidies Mwmbl's rough results.",

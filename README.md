@@ -11,6 +11,7 @@ In degoog: **Settings > Store > Add repository**, paste `https://github.com/Arom
 | Extension | Type | What it does |
 |---|---|---|
 | [Marginalia](engines/marginalia/README.md) | engine | Marginalia Search through its API. Polite by design (rate limiting, cool-down). Needs a free API key. |
+| [Mojeek](engines/mojeek/README.md) | engine | Mojeek web search without an API key. Passes its proof-of-work check once a month, then one request per search. |
 | [Mwmbl](engines/mwmbl/README.md) | engine | The non-profit community search engine, on the web tab. Works without a key; one request per search, later pages from a short cache. |
 | [OpenAlex](engines/openalex/README.md) | engine | Scholarly works on a **Scholar** tab. Works without a key; stops when the daily budget is spent. |
 | [CORE](engines/core/README.md) | engine | Open access papers on the same **Scholar** tab. Needs a free API key. |
