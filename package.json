@@ -31,6 +31,13 @@
       "description": "Unsplash photos on the Images tab through the official API. Needs a free API key. Credits the photographer with their profile address.",
       "version": "1.1.0",
       "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "engines/selfhst",
+      "name": "selfh.st",
+      "description": "Search the selfh.st self-hosted app directory on an Apps tab, including its alternative-to lists. Downloads the list once, caches it on disk and searches locally.",
+      "version": "1.0.0",
+      "minDegoogVersion": "1.1.0"
     }
   ]
 }
