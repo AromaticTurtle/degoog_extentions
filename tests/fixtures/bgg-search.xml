@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HAND-WRITTEN test data in BoardGameGeek's documented search layout. Invented games and ids, not a real recording. -->
+<items total="6" termsofuse="https://boardgamegeek.com/xmlapi/termsofuse">
+  <item type="boardgame" id="900001">
+    <name type="primary" value="Starfall" />
+    <name type="alternate" value="Sternenfall" />
+    <name type="alternate" value="Chute d&#39;&#233;toiles" />
+    <yearpublished value="2019" />
+  </item>
+  <item type="boardgameexpansion" id="900002">
+    <name type="primary" value="Starfall: Nebula Expansion" />
+    <yearpublished value="2020" />
+  </item>
+  <item type="boardgame" id="900003">
+    <name type="primary" value="Starfall Duel" />
+    <name type="alternate" value="Duel of Starfall" />
+    <yearpublished value="2021" />
+  </item>
+  <item type="boardgame" id="900004">
+    <name type="primary" value="Starfall Legacy" />
+    <yearpublished value="2023" />
+  </item>
+  <item type="boardgame" id="900005">
+    <name type="primary" value="Starfield Station" />
+    <yearpublished value="2018" />
+  </item>
+  <item type="boardgame" id="900006">
+    <name type="primary" value="Dawn of Starfall" />
+    <yearpublished value="2015" />
+  </item>
+</items>

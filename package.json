@@ -5,6 +5,14 @@
   "license": "MIT",
   "plugins": [
     {
+      "path": "plugins/board-games",
+      "name": "Board games (BoardGameGeek)",
+      "description": "Board game panel in the side column from BoardGameGeek: rating, rank, weight, players, playing time, designers, mechanics. Needs a free BGG API token (registration required). Cached and capped to a daily request limit.",
+      "version": "1.0.0",
+      "type": "slot",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
       "path": "plugins/game-info",
       "name": "Game info (IGDB + ProtonDB)",
       "description": "Video game panel in the side column: IGDB scores, platforms, developer, time to beat, ProtonDB Linux compatibility and a Steam link. Needs free Twitch/IGDB credentials. Cached.",

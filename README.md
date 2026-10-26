@@ -19,6 +19,7 @@ In degoog: **Settings > Store > Add repository**, paste `https://github.com/Arom
 | [selfh.st](engines/selfhst/README.md) | engine | The selfh.st self-hosted app directory on an **Apps** tab, with its alternative-to lists. Cached on disk, searched locally. |
 | [selfh.st icons](favicon/selfhst/README.md) | favicon provider | Real app logos from selfh.st/icons for self-hosted software sites. Unknown hosts fall through to the next provider. |
 | [Game info (IGDB + ProtonDB)](plugins/game-info/README.md) | slot plugin | A video game panel beside the results: IGDB scores, platforms, developer, time to beat, ProtonDB Linux compatibility and a Steam link. Needs free Twitch/IGDB credentials. Cached. |
+| [Board games (BoardGameGeek)](plugins/board-games/README.md) | slot plugin | A board game panel beside the results: BGG rating, rank, weight, players, playing time, designers, mechanics. Needs a BGG API token (registration required). Cached and capped to a daily request limit. |
 
 ## Planned
 
