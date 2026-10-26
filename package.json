@@ -39,5 +39,14 @@
       "version": "1.0.0",
       "minDegoogVersion": "1.1.0"
     }
+  ],
+  "favicon": [
+    {
+      "path": "favicon/selfhst",
+      "name": "selfh.st icons",
+      "description": "Real app logos from selfh.st/icons for self-hosted software sites (n8n.io, jellyfin.org and about 830 more). Unknown hosts fall through to the next provider. Drag it above Google in Settings, Favicons.",
+      "version": "1.0.0",
+      "minDegoogVersion": "1.1.0"
+    }
   ]
 }

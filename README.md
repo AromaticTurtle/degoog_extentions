@@ -15,6 +15,7 @@ In degoog: **Settings > Store > Add repository**, paste `https://github.com/Arom
 | [CORE](engines/core/README.md) | engine | Open access papers on the same **Scholar** tab. Needs a free API key. |
 | [Unsplash](engines/unsplash/README.md) | engine | Photos on the **Images** tab through the official API. Needs a free API key. |
 | [selfh.st](engines/selfhst/README.md) | engine | The selfh.st self-hosted app directory on an **Apps** tab, with its alternative-to lists. Cached on disk, searched locally. |
+| [selfh.st icons](favicon/selfhst/README.md) | favicon provider | Real app logos from selfh.st/icons for self-hosted software sites. Unknown hosts fall through to the next provider. |
 
 ## Planned
 
@@ -27,6 +28,7 @@ In degoog: **Settings > Store > Add repository**, paste `https://github.com/Arom
 ```
 package.json      store manifest: one entry per extension
 engines/<name>/   one folder per engine
+favicon/<name>/   one folder per favicon provider
 tests/            unit tests and fixtures
 ```
 
