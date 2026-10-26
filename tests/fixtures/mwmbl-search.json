@@ -1,0 +1,82 @@
+{
+ "query": "linear b",
+ "number_of_results": 6,
+ "results": [
+  {
+   "url": "https://en.wikipedia.org/wiki/Linear_B",
+   "title": "Linear B",
+   "title_highlights": [
+    "Linear B"
+   ],
+   "content": "contains Linear B Unicode characters. Without proper rendering support, you may see question marks, boxes, or other symbols instead of Linear B. Linear B is",
+   "content_highlights": [
+    "Linear B"
+   ],
+   "engine": "wikipedia",
+   "score": 1.0
+  },
+  {
+   "url": "https://linear.app/",
+   "title": "Linear – Plan and build products",
+   "title_highlights": [
+    "Linear"
+   ],
+   "content": " Linear is a purpose-built tool for planning and building productsLinearisapurpose-builttoolforplanningandbuildingproductsPlan and build your productPlana…",
+   "content_highlights": [
+    "Linear"
+   ],
+   "engine": "mwmbl",
+   "score": 0.5
+  },
+  {
+   "url": "https://el.wikipedia.org/wiki/Linear_B",
+   "title": "Linear B - Βικιπαίδεια",
+   "title_highlights": [
+    "Linear B"
+   ],
+   "content": "",
+   "content_highlights": [],
+   "engine": "mwmbl",
+   "score": 0.3333333333333333
+  },
+  {
+   "url": "https://no.wikipedia.org/wiki/Linear_B",
+   "title": "Linear B – Wikipedia",
+   "title_highlights": [
+    "Linear B"
+   ],
+   "content": "",
+   "content_highlights": [],
+   "engine": "mwmbl",
+   "score": 0.25
+  },
+  {
+   "url": "https://everipedia.org/wiki/lang_en/Linear_B",
+   "title": "Linear B Wiki",
+   "title_highlights": [
+    "Linear B"
+   ],
+   "content": " Linear B is a syllabic script that was used for writing Mycenaean Greek, the earliest attested form of Greek. The script predates the Greek alphabet by s…",
+   "content_highlights": [
+    "Linear B"
+   ],
+   "engine": "mwmbl",
+   "score": 0.14285714285714285
+  },
+  {
+   "url": "https://www.bbc.com/news/av/magazine-22799109/linear-b-decoder-michael-ventris-on-bbc-in-1952",
+   "title": "Linear B decoder Michael Ventris on BBC in 1952 - BBC News",
+   "title_highlights": [
+    "Linear B"
+   ],
+   "content": " Linear B decoder Michael Ventris on BBC in 1952 To play this video you need to enable JavaScript in your browser. For more than 50 years, a mysterious an…",
+   "content_highlights": [
+    "Linear B"
+   ],
+   "engine": "mwmbl",
+   "score": 0.125
+  }
+ ],
+ "monthly_usage": null,
+ "monthly_limit": null
+}

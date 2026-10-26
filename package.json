@@ -12,6 +12,13 @@
       "minDegoogVersion": "1.1.0"
     },
     {
+      "path": "engines/mwmbl",
+      "name": "Mwmbl",
+      "description": "Mwmbl, the non-profit community search engine, on the web tab. Works without a key. One request per search; later pages come from a 10 minute cache. Tidies Mwmbl's rough results.",
+      "version": "1.0.0",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
       "path": "engines/openalex",
       "name": "OpenAlex",
       "description": "Scholarly works from OpenAlex on a Scholar tab. Works without a key; a free key raises the daily budget. Stops when the daily budget is spent.",
