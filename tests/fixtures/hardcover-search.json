@@ -1,0 +1,404 @@
+{
+  "data": {
+    "search": {
+      "results": {
+        "found": 6,
+        "hits": [
+          {
+            "document": {
+              "activities_count": 0,
+              "alternative_titles": [
+                "Der Glasgarten"
+              ],
+              "audio_seconds": 45000,
+              "author_names": [
+                "Mara Fenwick"
+              ],
+              "compilation": false,
+              "content_warnings": [
+                "Loss of a parent"
+              ],
+              "contribution_types": [
+                "Author"
+              ],
+              "contributions": [
+                {
+                  "author": {
+                    "name": "Mara Fenwick",
+                    "slug": "mara-fenwick"
+                  },
+                  "contribution": null
+                }
+              ],
+              "cover_color": "green",
+              "description": "A mapmaker inherits an orchard where the trees bear glass fruit, and every pane shows a day that has not happened yet. She has one harvest season to decide which futures are worth keeping.\n\nThe first book of the Orchard Cycle. This text is invented for tests.",
+              "featured_series": {
+                "id": 501,
+                "position": 1,
+                "series": {
+                  "name": "Orchard Cycle",
+                  "slug": "orchard-cycle"
+                }
+              },
+              "featured_series_position": 1,
+              "genres": [
+                "Fantasy",
+                "Magical Realism",
+                "Adventure",
+                "Mystery",
+                "Coming of Age"
+              ],
+              "has_audiobook": true,
+              "has_ebook": true,
+              "isbns": [
+                "0000000011",
+                "9780000000011"
+              ],
+              "lists_count": 800,
+              "moods": [
+                "mysterious",
+                "reflective",
+                "hopeful",
+                "adventurous"
+              ],
+              "pages": 412,
+              "prompts_count": 0,
+              "rating": 4.31,
+              "ratings_count": 3100,
+              "release_date_i": 20140311,
+              "release_year": 2014,
+              "reviews_count": 900,
+              "series_names": [
+                "Orchard Cycle"
+              ],
+              "slug": "the-glass-orchard",
+              "subtitle": "",
+              "tags": [
+                "orchards",
+                "maps"
+              ],
+              "title": "The Glass Orchard",
+              "users_count": 5400,
+              "users_read_count": 4200,
+              "id": 9001001,
+              "image": {
+                "url": "https://assets.hardcover.app/books/9001001/cover.jpg",
+                "color": "#2b5d3a",
+                "width": 400,
+                "height": 600
+              },
+              "user_books": [
+                {
+                  "user": {
+                    "username": "invented_reader",
+                    "name": "Invented Reader"
+                  },
+                  "review_raw": "Invented private review text"
+                }
+              ],
+              "lists": [
+                {
+                  "name": "Invented list",
+                  "user": {
+                    "username": "list_owner"
+                  }
+                }
+              ]
+            },
+            "highlights": [],
+            "text_match": 1000,
+            "text_match_info": {
+              "best_field_score": "1",
+              "score": "1"
+            }
+          },
+          {
+            "document": {
+              "activities_count": 0,
+              "alternative_titles": [],
+              "audio_seconds": 0,
+              "author_names": [
+                "Mara Fenwick"
+              ],
+              "compilation": false,
+              "content_warnings": [],
+              "contribution_types": [
+                "Author"
+              ],
+              "contributions": [],
+              "cover_color": "",
+              "description": "The second Orchard Cycle book. The tide takes the glass trees, and the mapmaker follows the salt road north. This text is invented for tests.",
+              "featured_series": {
+                "name": "Orchard Cycle",
+                "position": 2
+              },
+              "featured_series_position": 2,
+              "genres": [
+                "Fantasy",
+                "Adventure"
+              ],
+              "has_audiobook": false,
+              "has_ebook": true,
+              "isbns": [
+                "9780000000028"
+              ],
+              "lists_count": 0,
+              "moods": [
+                "dark",
+                "tense"
+              ],
+              "pages": 438,
+              "prompts_count": 0,
+              "rating": 4.12,
+              "ratings_count": 1900,
+              "release_date_i": 0,
+              "release_year": 2016,
+              "reviews_count": 500,
+              "series_names": [
+                "Orchard Cycle"
+              ],
+              "slug": "the-salt-orchard",
+              "subtitle": "",
+              "tags": [],
+              "title": "The Salt Orchard",
+              "users_count": 3100,
+              "users_read_count": 2400,
+              "id": "9001002",
+              "cached_image": {
+                "url": "https://assets.hardcover.app/books/9001002/cover.jpg"
+              }
+            },
+            "highlights": [],
+            "text_match": 999,
+            "text_match_info": {
+              "best_field_score": "1",
+              "score": "1"
+            }
+          },
+          {
+            "document": {
+              "activities_count": 0,
+              "alternative_titles": [],
+              "audio_seconds": 0,
+              "author_names": [
+                "Mara Fenwick"
+              ],
+              "compilation": true,
+              "content_warnings": [],
+              "contribution_types": [
+                "Author"
+              ],
+              "contributions": [],
+              "cover_color": "",
+              "description": "All books of the Orchard Cycle in one volume. Invented text for tests.",
+              "featured_series": null,
+              "featured_series_position": null,
+              "genres": [
+                "Fantasy"
+              ],
+              "has_audiobook": false,
+              "has_ebook": false,
+              "isbns": [
+                "9780000000035"
+              ],
+              "lists_count": 0,
+              "moods": [],
+              "pages": 1320,
+              "prompts_count": 0,
+              "rating": 4.4,
+              "ratings_count": 300,
+              "release_date_i": 0,
+              "release_year": 2019,
+              "reviews_count": 0,
+              "series_names": [
+                "Orchard Cycle"
+              ],
+              "slug": "orchard-cycle-complete-collection",
+              "subtitle": "",
+              "tags": [],
+              "title": "Orchard Cycle: Complete Collection",
+              "users_count": 900,
+              "users_read_count": 500,
+              "id": 9001003,
+              "image": {
+                "url": "https://assets.hardcover.app/books/9001003/cover.jpg"
+              }
+            },
+            "highlights": [],
+            "text_match": 998,
+            "text_match_info": {
+              "best_field_score": "1",
+              "score": "1"
+            }
+          },
+          {
+            "document": {
+              "activities_count": 0,
+              "alternative_titles": [],
+              "audio_seconds": 0,
+              "author_names": [
+                "Idris Vale"
+              ],
+              "compilation": false,
+              "content_warnings": [],
+              "contribution_types": [
+                "Author"
+              ],
+              "contributions": [],
+              "cover_color": "",
+              "description": "A clockwork surveyor charts a city that rearranges itself each night. Invented text for tests.",
+              "featured_series": {
+                "series": {
+                  "name": "Brass Cartographer"
+                },
+                "position": 2.5
+              },
+              "featured_series_position": 2.5,
+              "genres": [
+                "Science Fiction",
+                "Fantasy"
+              ],
+              "has_audiobook": false,
+              "has_ebook": false,
+              "isbns": [],
+              "lists_count": 0,
+              "moods": [
+                "curious"
+              ],
+              "pages": 355,
+              "prompts_count": 0,
+              "rating": 3.9,
+              "ratings_count": 1200,
+              "release_date_i": 0,
+              "release_year": 2021,
+              "reviews_count": 0,
+              "series_names": [
+                "Brass Cartographer"
+              ],
+              "slug": "the-brass-cartographer-lantern-fires",
+              "subtitle": "",
+              "tags": [],
+              "title": "The Brass Cartographer: Lantern Fires",
+              "users_count": 2400,
+              "users_read_count": 1800,
+              "id": 9001004
+            },
+            "highlights": [],
+            "text_match": 997,
+            "text_match_info": {
+              "best_field_score": "1",
+              "score": "1"
+            }
+          },
+          {
+            "document": {
+              "activities_count": 0,
+              "alternative_titles": [],
+              "audio_seconds": 0,
+              "author_names": "Odell Marsh",
+              "compilation": false,
+              "content_warnings": [],
+              "contribution_types": [
+                "Author"
+              ],
+              "contributions": [],
+              "cover_color": "",
+              "description": "A ferry pilot keeps a river's secrets for forty years. Invented text for tests.",
+              "featured_series": null,
+              "featured_series_position": null,
+              "genres": "Literary Fiction",
+              "has_audiobook": "false",
+              "has_ebook": "true",
+              "isbns": [
+                "978-0-00-000004-2"
+              ],
+              "lists_count": 0,
+              "moods": [],
+              "pages": "256",
+              "prompts_count": 0,
+              "rating": "3.8",
+              "ratings_count": "212",
+              "release_date_i": 0,
+              "release_year": "2008",
+              "reviews_count": "40",
+              "series_names": [],
+              "slug": "quiet-rivers",
+              "subtitle": "",
+              "tags": [],
+              "title": "Quiet Rivers",
+              "users_count": "310",
+              "users_read_count": "260",
+              "id": "9001005"
+            },
+            "highlights": [],
+            "text_match": 996,
+            "text_match_info": {
+              "best_field_score": "1",
+              "score": "1"
+            }
+          },
+          {
+            "document": {
+              "activities_count": 0,
+              "alternative_titles": [],
+              "audio_seconds": 0,
+              "author_names": [
+                "Tess Whitcombe"
+              ],
+              "compilation": false,
+              "content_warnings": [],
+              "contribution_types": [
+                "Author"
+              ],
+              "contributions": [],
+              "cover_color": "",
+              "description": "A cosy mystery on a quiet lane. Invented text for tests.",
+              "featured_series": null,
+              "featured_series_position": null,
+              "genres": [
+                "Mystery",
+                "Cozy Mystery"
+              ],
+              "has_audiobook": false,
+              "has_ebook": false,
+              "isbns": [],
+              "lists_count": 0,
+              "moods": [],
+              "pages": 288,
+              "prompts_count": 0,
+              "rating": 3.5,
+              "ratings_count": 70,
+              "release_date_i": 0,
+              "release_year": 2012,
+              "reviews_count": 0,
+              "series_names": [],
+              "slug": "orchard-lane",
+              "subtitle": "",
+              "tags": [],
+              "title": "Orchard Lane",
+              "users_count": 150,
+              "users_read_count": 90,
+              "id": 9001006,
+              "image": "https://assets.hardcover.app/books/9001006/cover.jpg"
+            },
+            "highlights": [],
+            "text_match": 995,
+            "text_match_info": {
+              "best_field_score": "1",
+              "score": "1"
+            }
+          }
+        ],
+        "out_of": 5000000,
+        "page": 1,
+        "search_cutoff": false,
+        "search_time_ms": 4,
+        "request_params": {
+          "collection_name": "Book_production",
+          "per_page": 8,
+          "q": "orchard"
+        }
+      }
+    }
+  }
+}

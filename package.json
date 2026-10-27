@@ -5,6 +5,14 @@
   "license": "MIT",
   "plugins": [
     {
+      "path": "plugins/books",
+      "name": "Books (Hardcover)",
+      "description": "Book panel in the side column from Hardcover: cover, authors, series, Hardcover rating and readers, genres, pages, description. Needs a free Hardcover API token (create it with only the read:catalog permission). Cached and capped to a daily request limit.",
+      "version": "1.0.0",
+      "type": "slot",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
       "path": "plugins/board-games",
       "name": "Board games (BoardGameGeek)",
       "description": "Board game panel in the side column from BoardGameGeek data: rating, rank, weight, players, playing time, designers, mechanics. Three optional sources with an automatic fallback: the BGG XML API (token, registration required), recommend.games (no key) and BGG's own website API (opt-in, off by default). Cached and capped by per-source daily limits.",
