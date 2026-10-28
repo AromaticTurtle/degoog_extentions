@@ -62,9 +62,13 @@ const VIDEO_WORDS = [
   "controller",
   "console",
   "patch notes",
-  "trailer",
   "system requirements",
   "fps",
+  "remaster(?:ed)?",
+  "remake",
+  "rpg",
+  "roguelike",
+  "soulslike",
 ];
 
 const TRAILING = new RegExp(`(?:\\s+(?:${BOARD_WORDS.join("|")}))+\\s*$`, "i");
@@ -93,7 +97,15 @@ export const looksLikeATitleSearch = (query) => {
 // A video game query ("skyrim walkthrough", "elden ring ps5") does not need a board game lookup.
 export const isVideoGameQuery = (query) => hasVideoGameWord(query) && !hasBoardGameWord(query);
 
-export const extractTerm = (query) => String(query ?? "").trim().replace(TRAILING, "").trim();
+// Ambiguous trailing words: "wingspan game" and "catan guide" are about the title, whatever kind of game it is. They are
+// dropped too, unless nothing meaningful would be left ("the game" stays "the game", "dice game" stays as it is).
+const AMBIGUOUS_TRAILING = new RegExp("(?:\\s+(?:games?|guide|reviews?|wiki|release date|requirements|trailer|multiplayer|co-?op))+\\s*$", "i");
+
+export const extractTerm = (query) => {
+  const term = String(query ?? "").trim().replace(TRAILING, "").trim();
+  const bare = term.replace(AMBIGUOUS_TRAILING, "").trim();
+  return bare && !/^(?:the|a|an|board|card|dice|video)$/i.test(bare) ? bare : term;
+};
 
 export const normalizeTitle = (text) =>
   String(text ?? "")

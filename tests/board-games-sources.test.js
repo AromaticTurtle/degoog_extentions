@@ -25,7 +25,7 @@ import {
 import { attributionHtml, buildPanel } from "../plugins/board-games/render.js";
 import { SETTINGS_SCHEMA } from "../plugins/board-games/settings.js";
 import { BARS, evaluate, formatExplanation, judge, pickGame, scoreGame, specificity, stripDecorations, titleSimilarity } from "../plugins/board-games/match.js";
-import { BoardGamesSlot } from "../plugins/board-games/index.js";
+import { BoardGamesSlot, LOOKUP_KEY } from "../plugins/board-games/index.js";
 import { DEFAULT_RECOMMEND_BASE, recommendSearchUrl } from "../plugins/board-games/sources/recommend-games.js";
 import { DEFAULT_GEEKDO_BASE, dynamicInfoUrl, geekitemsUrl } from "../plugins/board-games/sources/bgg-internal.js";
 import {
@@ -1559,5 +1559,190 @@ describe("explaining decisions (debugMatching)", () => {
     const field = SETTINGS_SCHEMA.find((entry) => entry.key === "debugMatching");
     expect(field).toMatchObject({ type: "toggle", default: "false", advanced: true });
     expect(field.required).toBeUndefined();
+  });
+});
+
+// ---- The contract with the game-info plugin: lookupTitle(), registered under a global symbol ----
+
+describe("the lookup contract (lookupTitle)", () => {
+  const ask = (slot, term, context, deadlineMs = 2500) => slot.lookupTitle({ term, deadlineMs, context });
+
+  test("init registers the function under a well-known symbol, a second init replaces it, a reloaded module clears it", async () => {
+    expect(LOOKUP_KEY).toBe(Symbol.for("degoog-extentions.board-games.lookup"));
+    const first = make();
+    first.init({});
+    expect(typeof globalThis[LOOKUP_KEY]).toBe("function");
+    const before = globalThis[LOOKUP_KEY];
+    first.init({});
+    expect(globalThis[LOOKUP_KEY]).toBe(before); // the same instance keeps one stable function
+    const second = make();
+    second.init({});
+    expect(globalThis[LOOKUP_KEY]).not.toBe(before);
+    // the registered function answers like the method
+    second.configure({ ...SOURCE_SETTINGS, enableApi: "false" });
+    expect((await globalThis[LOOKUP_KEY]({ term: "starfall", deadlineMs: 1000, context: makeContext() })).status).toBe("match");
+    // a module that is evaluated again (degoog reloads plugins) drops the registration; only init brings it back
+    await import("../plugins/board-games/index.js?reloaded=1");
+    expect(globalThis[LOOKUP_KEY]).toBeUndefined();
+    first.init({});
+    expect(typeof globalThis[LOOKUP_KEY]).toBe("function");
+    delete globalThis[LOOKUP_KEY];
+  });
+
+  test("match, none and unknown", async () => {
+    const slot = make();
+    expect(await ask(slot, "starfall", makeContext())).toEqual({ status: "match", name: "Starfall", id: "900001" });
+    expect(await ask(make(), "zzz nothing here", makeContext())).toEqual({ status: "none" });
+    // a working source that finds no confident match is final: nothing else is asked
+    const context = makeContext();
+    expect(await ask(make(), "zzz nothing here", context)).toEqual({ status: "none" });
+    expect(count(context, "rg")).toBe(0);
+  });
+
+  test("unknown, with no request at all, when no source is usable, the plugin is disabled, or the gating would refuse the term", async () => {
+    const nothing = makeContext();
+    expect(await ask(make({ enableApi: "false", enableRecommendGames: "false" }), "starfall", nothing)).toEqual({ status: "unknown" });
+    expect(await ask(make({ apiToken: "", enableRecommendGames: "false" }), "starfall", nothing)).toEqual({ status: "unknown" });
+    expect(await ask(make({ disabled: "true" }), "starfall", nothing)).toEqual({ status: "unknown" });
+    expect(await ask(make({ requireBoardGameWord: "true" }), "starfall", nothing)).toEqual({ status: "unknown" });
+    expect(await ask(make(), "starfall ps5", nothing)).toEqual({ status: "unknown" });
+    expect(await ask(make(), "how to bake bread", nothing)).toEqual({ status: "unknown" });
+    expect(await ask(make(), "x", nothing)).toEqual({ status: "unknown" });
+    expect(nothing.calls).toHaveLength(0);
+    // a paused source is not usable either
+    const paused = make({ enableRecommendGames: "false" });
+    await capture(async () => paused.sources.api.upstream.pause(60_000, "test pause"));
+    expect(await ask(paused, "starfall", nothing)).toEqual({ status: "unknown" });
+    expect(nothing.calls).toHaveLength(0);
+  });
+
+  test("a source that failed is unknown, and the chain still falls back", async () => {
+    const context = makeContext({ respond: (kind) => (kind === "bgg-search" ? html5xx() : undefined) });
+    const broken = makeContext({ respond: (kind) => (kind === "bgg-search" || kind === "rg" ? html5xx() : undefined) });
+    await capture(async () => {
+      // recommend.games takes over, exactly as for execute()
+      expect(await ask(make(), "starfall", context)).toEqual({ status: "match", name: "Starfall", id: "900001" });
+      expect(await ask(make(), "starfall", broken)).toEqual({ status: "unknown" });
+    });
+  });
+
+  test("it shares requests with execute(): one upstream request each, concurrent or later", async () => {
+    const slot = make();
+    const context = makeContext();
+    const [panel, outcome] = await Promise.all([slot.execute("starfall", context), ask(slot, "starfall", context)]);
+    expect(panel.title).toBe("Starfall");
+    expect(outcome.status).toBe("match");
+    expect(count(context, "bgg-search")).toBe(1);
+    expect(count(context, "bgg-thing")).toBe(1);
+    // a later lookup and a later execute cost nothing
+    context.calls.length = 0;
+    expect((await ask(slot, "starfall", context)).status).toBe("match");
+    expect((await slot.execute("starfall", context)).title).toBe("Starfall");
+    expect(context.calls).toHaveLength(0);
+    // and the other way round: lookup first, execute afterwards
+    const other = make();
+    const again = makeContext();
+    expect((await ask(other, "starfall", again)).status).toBe("match");
+    expect((await other.execute("starfall", again)).title).toBe("Starfall");
+    expect(count(again, "bgg-search")).toBe(1);
+    expect(count(again, "bgg-thing")).toBe(1);
+  });
+
+  test("a cached 'no match' costs nothing either", async () => {
+    const slot = make();
+    const context = makeContext();
+    expect((await ask(slot, "zzz nothing here", context)).status).toBe("none");
+    const used = context.calls.length;
+    expect((await ask(slot, "zzz nothing here", context)).status).toBe("none");
+    expect(context.calls).toHaveLength(used);
+  });
+
+  test("it waits at most deadlineMs, and the late reply still fills the cache", async () => {
+    const slot = make({ enableApi: "false" });
+    const context = makeContext({ recommend: SKYREACH_REPLY });
+    const realFetch = context.fetch;
+    context.fetch = async (url, init) => {
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      return realFetch(url, init);
+    };
+    const started = Date.now();
+    expect(await ask(slot, "skyreach", context, 25)).toEqual({ status: "unknown" });
+    expect(Date.now() - started).toBeLessThan(100);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(await ask(slot, "skyreach", context, 25)).toMatchObject({ status: "match", name: "Skyreach" });
+    expect((await slot.execute("skyreach", context)).title).toBe("Skyreach");
+    expect(count(context, "rg")).toBe(1);
+  });
+
+  test("after execute() gave up on a slow title, the lookup does not promise a board game panel that will not come", async () => {
+    const slot = make({ enableApi: "false" });
+    slot.answerWindowMs = 20;
+    const context = makeContext({ recommend: SKYREACH_REPLY });
+    const realFetch = context.fetch;
+    context.fetch = async (url, init) => {
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      return realFetch(url, init);
+    };
+    expect(await slot.execute("skyreach", context)).toEqual(EMPTY); // too slow for this search
+    // the reply would arrive inside the wait below, but the panel is already gone for this search
+    expect(await ask(slot, "skyreach", context, 1000)).toEqual({ status: "unknown" });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect((await ask(slot, "skyreach", context, 1000)).status).toBe("match"); // the next search gets it from the cache
+    expect((await slot.execute("skyreach", context)).title).toBe("Skyreach");
+    expect(count(context, "rg")).toBe(1);
+  });
+
+  test("a deadline of zero or less makes no request, and the default wait is the slot's start window", async () => {
+    const context = makeContext();
+    expect(await ask(make(), "starfall", context, 0)).toEqual({ status: "unknown" });
+    expect(await ask(make(), "starfall", context, -5)).toEqual({ status: "unknown" });
+    expect(context.calls).toHaveLength(0);
+    expect((await make().lookupTitle({ term: "starfall", context })).status).toBe("match");
+  });
+
+  test("it never throws, whatever it is given", async () => {
+    const slot = make();
+    for (const request of [undefined, null, {}, { term: null }, { term: 5 }, { term: {} }, { term: "starfall", deadlineMs: "soon" }, { term: "x".repeat(5000) }]) {
+      const outcome = await slot.lookupTitle(request);
+      expect(["match", "none", "unknown"]).toContain(outcome.status);
+    }
+    const throwing = { ...makeContext(), fetch: async () => { throw new Error("down"); } };
+    await capture(async () => expect(await ask(make(), "starfall", throwing)).toEqual({ status: "unknown" }));
+    const boom = make();
+    boom._find = async () => { throw new Error("boom"); };
+    expect(await ask(boom, "starfall", makeContext())).toEqual({ status: "unknown" });
+  });
+
+  test("the answers are frozen values and carry no urls or secrets", async () => {
+    const outcome = await ask(make(), "starfall", makeContext());
+    expect(Object.keys(outcome).sort()).toEqual(["id", "name", "status"]);
+    expect(JSON.stringify(outcome)).not.toContain("http");
+    expect(JSON.stringify(outcome)).not.toContain(TOKEN);
+    expect(Object.isFrozen(await ask(make(), "zzz nothing here", makeContext()))).toBe(true);
+  });
+
+  test("debugMatching logs one line per question, without secrets or addresses", async () => {
+    const loud = make({ debugMatching: "true" });
+    const lines = await capture(async () => {
+      await ask(loud, "starfall", makeContext());
+      await ask(loud, "starfall", makeContext());
+    });
+    expect(lines.filter((line) => line.includes("asked about by game-info"))).toEqual([
+      '[board-games] "starfall" asked about by game-info: match "Starfall"',
+      '[board-games] "starfall" asked about by game-info: match "Starfall"',
+    ]);
+    for (const line of lines) {
+      expect(line).not.toContain(TOKEN);
+      expect(line).not.toContain("http");
+    }
+    expect(await capture(() => ask(make(), "starfall", makeContext()))).toEqual([]);
+  });
+
+  test("the title is cleaned like a query: a trailing 'game' is dropped, 'the game' is not", async () => {
+    const context = makeContext();
+    expect((await ask(make(), "starfall game", context)).status).toBe("match");
+    const slot = make();
+    const panel = await slot.execute("starfall game", makeContext());
+    expect(panel.title).toBe("Starfall");
   });
 });

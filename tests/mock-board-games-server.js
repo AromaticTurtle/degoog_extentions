@@ -8,11 +8,13 @@
 //   "apidown" -> the XML API search answers 503     "recdown" -> recommend.games answers 503
 //   "cfblock" -> from then on the geekdo endpoints answer a Cloudflare-style 403 page (GET /__reset clears it)
 //   "quota"   -> the XML API and recommend.games answer 429     "zzz" -> every search finds nothing
+// MOCK_DELAY_MS=4000 (environment) makes every answer except /__stats and /__reset wait that long first, to try a slow upstream.
 // GET /__stats reports the requests served per upstream.
 // Usage: bun tests/mock-board-games-server.js [port]
 // Point the plugin at it:  DEGOOG_BGG_API_BASE=http://host:4469/xmlapi2  DEGOOG_RECOMMEND_GAMES_BASE=http://host:4469/recommend
 //   DEGOOG_GEEKDO_BASE=http://host:4469/geekdo/api  DEGOOG_WIKIDATA_API=http://host:4469/wikidata/w/api.php
 const port = Number(process.argv[2] || 4469);
+const delayMs = Number(process.env.MOCK_DELAY_MS || 0);
 const text = (name) => Bun.file(new URL(`./fixtures/${name}`, import.meta.url)).text();
 const json = (name) => Bun.file(new URL(`./fixtures/${name}`, import.meta.url)).json();
 const search = await text("bgg-search.xml");
@@ -44,7 +46,7 @@ const itemBlocks = thing.match(/<item\b[\s\S]*?<\/item>/g) ?? [];
 
 Bun.serve({
   port,
-  fetch(request) {
+  async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === "/__stats") return Response.json(stats);
     if (url.pathname === "/__reset") {
@@ -54,6 +56,7 @@ Bun.serve({
     }
     // Only the method and path are logged: never a query string or a header.
     console.log(`MOCK ${request.method} ${url.pathname}`);
+    if (delayMs > 0) await Bun.sleep(delayMs);
 
     if (url.pathname.startsWith("/xmlapi2/")) {
       if (request.headers.get("authorization") !== "Bearer test-token") {

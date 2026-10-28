@@ -137,6 +137,27 @@ third-party reports; check the current terms yourself.
   credit link in `render.js` (`attributionHtml`) and size `.board-games-credit img` in `style.css`. If your instance is
   public, do this.
 
+## Board game or video game?
+Some titles are both. By default **this panel wins over the video game panel** of the Game info plugin: when a board game
+with the same title matches, Game info hides its panel (see its README for the word lists and the setting **Prefer the board
+game panel**, which turns this off). A query with a word that can only mean a video game (`wingspan ps5`, `skyrim
+walkthrough`, `elden ring steam`, `remake`, `rpg`...) never reaches this plugin; a board game word (`wingspan board game`,
+`catan rules`, `tabletop`) always does and keeps the video game panel away. Bare `game`, `guide`, `review`, `wiki`, `trailer`,
+`co-op` and `multiplayer` decide nothing: `wingspan game` is searched as `wingspan`.
+
+- **The contract:** in `init()` this plugin registers `lookupTitle({ term, deadlineMs, context })` under
+  `globalThis[Symbol.for("degoog-extentions.board-games.lookup")]` (replaced on every init, removed when the module is
+  reloaded, so a disabled plugin is never registered). It answers `{ status: "match", name, id }` for a confident board
+  game, `{ status: "none" }` when a working source found no confident match, and `{ status: "unknown" }` when no source is
+  usable (disabled, no token, paused, over its limit, or **Only for queries that sound like board games** is on, which the
+  plain title does not satisfy), when it was too slow, or on any failure. It uses the same sources, caches, pauses, limits and
+  single-flight as a search, so asking and searching for the same title cost one request together. It never throws, makes
+  no request without a usable source, and waits at most `deadlineMs`; a slower reply keeps running and fills the cache.
+- **A cold first search** that is too slow for the slot (recommend.games: 15 to 25 s) gives no board game panel; the lookup
+  then says `unknown`, so the video game shows first. The next search finds the cached board game and only that panel shows.
+- With **Explain matching in the log** on, each question from Game info is one line:
+  `[board-games] "wingspan" asked about by game-info: match "Wingspan"` (or `none`, `unknown`).
+
 ## How the match is decided
 A game with the right title is shown when it has **enough BGG ratings for how specific your query is**: a long, distinctive title
 (three or more words, or 14+ letters) needs few ratings, a two-word or long single-word title (`wingspan`, `catan`) a moderate
@@ -188,7 +209,8 @@ the constants at the top of `match.js` (`BARS`, the intent thresholds) and were 
   `test-token`): `DEGOOG_BGG_API_BASE=http://host:4469/xmlapi2`, `DEGOOG_RECOMMEND_GAMES_BASE=http://host:4469/recommend`,
   `DEGOOG_GEEKDO_BASE=http://host:4469/geekdo/api`, `DEGOOG_WIKIDATA_API=http://host:4469/wikidata/w/api.php`. A search term
   containing `apidown` makes the XML API answer 503, `recdown` does the same for recommend.games, and `cfblock` makes the
-  website API answer a Cloudflare-style 403 page. `GET /__stats` counts requests per upstream.
+  website API answer a Cloudflare-style 403 page. `MOCK_DELAY_MS=5000` in its environment makes every answer wait that long
+  (to try a slow upstream). `GET /__stats` counts requests per upstream.
 - Layout: `index.js` (settings, gating, the chain), `sources/` (one module per source behind `usable()` and
   `lookup({term, intent, context, deadline, hints})`), `upstream.js` (pause, spacing, budget and status handling shared by
   all of them), `shape.js` (every source's normalised game), `match.js`, `render.js`, `xml.js`.

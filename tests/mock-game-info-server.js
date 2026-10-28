@@ -4,6 +4,8 @@
 //   DEGOOG_PROTONDB_BASE=http://host:4468     DEGOOG_STEAM_BASE=http://host:4468
 // Credentials: client id "test-id", client secret "test-secret", access token "test-token".
 // A search containing "quota" answers 429, "zzz" finds nothing. ProtonDB app 999 answers 404.
+// A search for "starfall" also finds an invented video game of that name (the same title as the board game in the
+// board-games mock), listed first, so both plugins can match the same query.
 // GET /__stats reports how many requests each upstream served.
 // Usage: bun tests/mock-game-info-server.js [port]
 const port = Number(process.argv[2] || 4468);
@@ -13,6 +15,22 @@ const timeToBeat = await read("igdb-time-to-beat.json");
 const proton = await read("protondb-summary.json");
 const steam = await read("steam-storesearch.json");
 const stats = { token: 0, search: 0, ttb: 0, proton: 0, steam: 0 };
+const starfall = {
+  id: 990001,
+  slug: "starfall-video-game",
+  name: "Starfall",
+  summary: "An invented video game with the same title as an invented board game. This text is made up for tests.",
+  first_release_date: 1700000000,
+  game_type: { id: 0, type: "Main Game" },
+  genres: [{ name: "Strategy" }],
+  platforms: [{ name: "Nintendo Switch", abbreviation: "Switch" }],
+  aggregated_rating: 71,
+  aggregated_rating_count: 4,
+  rating: 68,
+  rating_count: 120,
+  total_rating: 69,
+  total_rating_count: 124,
+};
 
 Bun.serve({
   port,
@@ -39,6 +57,7 @@ Bun.serve({
         stats.search += 1;
         if (body.includes("quota")) return new Response("slow down", { status: 429, headers: { "retry-after": "120" } });
         if (body.includes("zzz")) return Response.json([]);
+        if (/search "[^"]*starfall/i.test(body)) return Response.json([starfall, ...games]);
         return Response.json(games);
       }
       if (url.pathname === "/v4/game_time_to_beats") {

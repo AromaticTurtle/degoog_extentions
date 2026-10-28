@@ -46,7 +46,65 @@ const TRAILING_WORDS = [
   "co-?op",
 ];
 
-const TRAILING = new RegExp(`(?:\\s+(?:${TRAILING_WORDS.join("|")}))+\\s*$`, "i");
+
+// Words that can only mean a VIDEO game. They skip the board game lookup and keep this panel. Bare "game", "guide",
+// "review", "wiki", "release date", "requirements", "trailer", "co-op" and "multiplayer" are ambiguous: board games have
+// them too, so they say nothing either way. The same list is in the board-games plugin (a test keeps them in step).
+const VIDEO_WORDS = [
+  "video games?",
+  "gameplay",
+  "steam",
+  "pc",
+  "ps[2-5]",
+  "playstation(?: [2-5])?",
+  "xbox(?: (?:one|360|series [xs]))?",
+  "nintendo(?: switch(?: 2)?)?",
+  "switch",
+  "dlc",
+  "walkthrough",
+  "speedrun",
+  "mods?",
+  "cheats?",
+  "patch notes",
+  "system requirements",
+  "controller",
+  "console",
+  "fps",
+  "remaster(?:ed)?",
+  "remake",
+  "rpg",
+  "roguelike",
+  "soulslike",
+];
+
+// Words that can only mean a BOARD game (or tabletop game in general). Without a video-game-specific word they keep this
+// panel from showing. The same list is in the board-games plugin.
+const BOARD_WORDS = [
+  "board ?games?",
+  "boardgames?",
+  "tabletop",
+  "bgg",
+  "boardgamegeek",
+  "meeples?",
+  "rulebook",
+  "rules",
+  "setup",
+  "expansions?",
+  "solo variant",
+  "worker placement",
+  "deck ?builder",
+  "co-?op board",
+  "card games?",
+  "dice games?",
+  "how to play",
+  "player count",
+];
+
+// Trailing board game words are dropped from the term too ("skyrim board game ps5" searches "skyrim"); the query only gets
+// here with a video-game-specific word, see isBoardGameQuery().
+const TRAILING = new RegExp(`(?:\\s+(?:${[...TRAILING_WORDS, ...BOARD_WORDS].join("|")}))+\\s*$`, "i");
+const VIDEO_WORD = new RegExp(`(?:^|\\s)(?:${VIDEO_WORDS.join("|")})(?:\\s|$)`, "i");
+const BOARD_WORD = new RegExp(`(?:^|\\s)(?:${BOARD_WORDS.join("|")})(?:\\s|$)`, "i");
 
 const GAME_WORD = new RegExp(
   `(?:^|\\s)(?:${TRAILING_WORDS.join("|")}|rpg|fps|roguelike|soulslike|indie game|remaster(?:ed)?|remake)(?:\\s|$)`,
@@ -61,6 +119,12 @@ export const MAX_QUERY = 80;
 export const MAX_WORDS = 8;
 
 export const hasGameWord = (query) => GAME_WORD.test(query);
+export const hasVideoGameWord = (query) => VIDEO_WORD.test(query);
+export const hasBoardGameWord = (query) => BOARD_WORD.test(query);
+
+// A board game query ("catan rules", "wingspan board game") is not a video game search, unless it also has a word that
+// can only mean a video game ("wingspan board game ps5").
+export const isBoardGameQuery = (query) => hasBoardGameWord(query) && !hasVideoGameWord(query);
 
 export const looksLikeATitleSearch = (query) => {
   const q = String(query ?? "").trim();

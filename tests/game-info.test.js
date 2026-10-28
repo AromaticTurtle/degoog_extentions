@@ -53,7 +53,7 @@ import {
 import { SETTINGS_SCHEMA } from "../plugins/game-info/settings.js";
 import { compactGame, compactProton, compactTimeToBeat, isoDate, steamAppIdOf } from "../plugins/game-info/shape.js";
 import { buildPanel, esc, formatDate, safeUrl, summarize, timeToBeatText } from "../plugins/game-info/render.js";
-import { GameInfoSlot, slot as defaultSlot } from "../plugins/game-info/index.js";
+import { BOARD_GAMES_LOOKUP, GameInfoSlot, slot as defaultSlot } from "../plugins/game-info/index.js";
 
 const read = (path) => Bun.file(new URL(path, import.meta.url));
 const gamesFixture = await read("./fixtures/igdb-games.json").json();
@@ -1586,5 +1586,232 @@ describe("explaining decisions (debugMatching)", () => {
     const field = SETTINGS_SCHEMA.find((entry) => entry.key === "debugMatching");
     expect(field).toMatchObject({ type: "toggle", default: "false", advanced: true });
     expect(field.required).toBeUndefined();
+  });
+});
+
+// --- Board game or video game? The board game panel is preferred when both match ---
+
+describe("preferring the board game panel", () => {
+  // A fake board-games lookup. `answer` is a function (or a value) for what lookupTitle returns.
+  const fakeBoard = (answer) => {
+    const calls = [];
+    const lookup = async (request) => {
+      calls.push(request);
+      return typeof answer === "function" ? answer(request) : answer;
+    };
+    return { calls, lookup };
+  };
+  const withBoard = (settings, board) => {
+    const slot = make({ clientId: ID, clientSecret: SECRET, ...settings });
+    slot.boardLookup = () => board?.lookup;
+    return slot;
+  };
+  const MATCH = { status: "match", name: "Skyrim: The Board Game", id: "900123" };
+  const searches = (context) => kinds(context).filter((kind) => kind === "search").length;
+
+  test("the symbol is the documented one and the default lookup reads the global", async () => {
+    expect(BOARD_GAMES_LOOKUP).toBe(Symbol.for("degoog-extentions.board-games.lookup"));
+    const slot = make();
+    expect(slot.boardLookup()).toBeUndefined();
+    const lookup = async () => ({ status: "none" });
+    globalThis[BOARD_GAMES_LOOKUP] = lookup;
+    try {
+      expect(slot.boardLookup()).toBe(lookup);
+    } finally {
+      delete globalThis[BOARD_GAMES_LOOKUP];
+    }
+  });
+
+  test("a matching board game hides the video game panel, before any follow-up request", async () => {
+    const board = fakeBoard(MATCH);
+    const slot = withBoard({}, board);
+    const context = makeContext();
+    expect(await slot.execute("skyrim", context)).toEqual(EMPTY);
+    expect(board.calls).toHaveLength(1);
+    expect(board.calls[0].term).toBe("skyrim");
+    expect(board.calls[0].context).toBe(context);
+    expect(board.calls[0].deadlineMs).toBeGreaterThan(0);
+    expect(board.calls[0].deadlineMs).toBeLessThanOrEqual(2500);
+    expect(kinds(context)).toEqual(["token", "search"]); // no time to beat, Steam or ProtonDB request for a hidden panel
+  });
+
+  test("none, unknown, anything odd, a throw, or no board-games plugin: the video game shows", async () => {
+    for (const answer of [{ status: "none" }, { status: "unknown" }, undefined, null, "match", 5, { status: "other" }, {}]) {
+      const slot = withBoard({}, fakeBoard(answer));
+      expect((await slot.execute("skyrim", makeContext())).title).toBe("The Elder Scrolls V: Skyrim");
+    }
+    const throwing = withBoard({}, fakeBoard(() => { throw new Error("boom"); }));
+    expect((await throwing.execute("skyrim", makeContext())).title).toBe("The Elder Scrolls V: Skyrim");
+    expect((await withBoard({}, null).execute("skyrim", makeContext())).title).toBe("The Elder Scrolls V: Skyrim");
+    const notAFunction = make({ clientId: ID, clientSecret: SECRET });
+    notAFunction.boardLookup = () => "nope";
+    expect((await notAFunction.execute("skyrim", makeContext())).title).toBe("The Elder Scrolls V: Skyrim");
+  });
+
+  test("a lookup that never answers cannot hold the panel past the wait budget", async () => {
+    const slot = withBoard({}, fakeBoard(() => new Promise(() => {})));
+    slot.startWindowMs = 500;
+    const started = Date.now();
+    const out = await slot.execute("skyrim", makeContext());
+    expect(out.title).toBe("The Elder Scrolls V: Skyrim");
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  test("the wait is the time left of 70 % of the slot timeout, at most 2.5 s, and skipped when almost nothing is left", async () => {
+    const board = fakeBoard({ status: "none" });
+    const roomy = withBoard({}, board);
+    roomy.startWindowMs = 7000;
+    await roomy.execute("skyrim", makeContext());
+    expect(board.calls[0].deadlineMs).toBeLessThanOrEqual(2500);
+    expect(board.calls[0].deadlineMs).toBeGreaterThan(2000);
+
+    const tight = fakeBoard({ status: "none" });
+    const small = withBoard({}, tight);
+    small.startWindowMs = 1000;
+    await small.execute("skyrim", makeContext());
+    expect(tight.calls[0].deadlineMs).toBeLessThanOrEqual(1000);
+
+    // the time already used counts: a slow IGDB search leaves less
+    const used = fakeBoard({ status: "none" });
+    const slowSearch = withBoard({}, used);
+    slowSearch.startWindowMs = 1200;
+    const context = makeContext();
+    const realFetch = context.fetch;
+    context.fetch = async (url, init) => {
+      if (kindOf(url) === "search") await new Promise((resolve) => setTimeout(resolve, 150));
+      return realFetch(url, init);
+    };
+    await slowSearch.execute("skyrim", context);
+    expect(used.calls[0].deadlineMs).toBeLessThanOrEqual(1050);
+
+    // nothing left: the lookup is not even asked, and the video game shows
+    const none = fakeBoard(MATCH);
+    const spent = withBoard({}, none);
+    spent.startWindowMs = 100;
+    expect((await spent.execute("skyrim", makeContext())).title).toBe("The Elder Scrolls V: Skyrim");
+    expect(none.calls).toHaveLength(0);
+  });
+
+  test("a clock that already ran out never waits longer than the slot allows", async () => {
+    const board = fakeBoard(MATCH);
+    const slot = withBoard({}, board);
+    let ticks = 0;
+    slot.now = () => 1_000_000 + (ticks += 4000); // every reading is 4 s later than the previous one
+    const out = await slot.execute("skyrim", makeContext());
+    expect(board.calls).toHaveLength(0);
+    expect(out.title).toBe("The Elder Scrolls V: Skyrim");
+  });
+
+  test("with preferBoardGames off the lookup is never called", async () => {
+    for (const value of ["false", false]) {
+      const board = fakeBoard(MATCH);
+      const slot = withBoard({ preferBoardGames: value }, board);
+      expect((await slot.execute("skyrim", makeContext())).title).toBe("The Elder Scrolls V: Skyrim");
+      expect(board.calls).toHaveLength(0);
+    }
+    const on = fakeBoard(MATCH);
+    expect(await withBoard({ preferBoardGames: "true" }, on).execute("skyrim", makeContext())).toEqual(EMPTY);
+    expect(on.calls).toHaveLength(1);
+    expect(make().preferBoardGames).toBe(true);
+    const field = SETTINGS_SCHEMA.find((entry) => entry.key === "preferBoardGames");
+    expect(field).toMatchObject({ type: "toggle", default: "true" });
+    expect(field.required).toBeUndefined();
+    expect(field.description).toContain("show the board game panel and hide this one");
+  });
+
+  test("a video-game-specific word skips the check entirely and keeps the video game", async () => {
+    for (const query of ["skyrim ps5", "skyrim walkthrough", "skyrim video game", "skyrim steam", "skyrim pc", "skyrim dlc", "skyrim mods", "skyrim remastered", "skyrim xbox series x", "skyrim nintendo switch", "skyrim gameplay", "skyrim speedrun"]) {
+      const board = fakeBoard(MATCH);
+      const slot = withBoard({}, board);
+      const out = await slot.execute(query, makeContext());
+      expect(out.title).toBe("The Elder Scrolls V: Skyrim");
+      expect(board.calls).toHaveLength(0);
+    }
+  });
+
+  test("a board game word keeps this panel from showing at all (and asks nothing)", async () => {
+    for (const query of ["skyrim board game", "skyrim boardgame", "skyrim tabletop", "skyrim rules", "skyrim rulebook", "skyrim bgg", "skyrim card game", "skyrim expansion", "skyrim how to play", "skyrim worker placement"]) {
+      const board = fakeBoard(MATCH);
+      const slot = withBoard({}, board);
+      const context = makeContext();
+      expect(slot.trigger(query)).toBe(false);
+      expect(await slot.execute(query, context)).toEqual(EMPTY);
+      expect(context.calls).toHaveLength(0);
+      expect(board.calls).toHaveLength(0);
+    }
+    // unless a word that can only mean a video game is there too
+    const board = fakeBoard({ status: "none" });
+    const slot = withBoard({}, board);
+    expect(slot.trigger("skyrim board game ps5")).toBe(true);
+    expect((await slot.execute("skyrim board game ps5", makeContext())).title).toBe("The Elder Scrolls V: Skyrim");
+    expect(board.calls).toHaveLength(0);
+  });
+
+  test("the ambiguous words ('game', 'guide', 'review', 'wiki', 'trailer', 'co-op') ask the board game first", async () => {
+    for (const query of ["skyrim game", "skyrim games", "skyrim guide", "skyrim review", "skyrim wiki", "skyrim trailer", "skyrim co-op", "skyrim multiplayer", "skyrim release date"]) {
+      const board = fakeBoard(MATCH);
+      const slot = withBoard({}, board);
+      expect(slot.trigger(query)).toBe(true);
+      expect(await slot.execute(query, makeContext())).toEqual(EMPTY);
+      expect(board.calls).toHaveLength(1);
+      expect(board.calls[0].term).toBe("skyrim"); // the trailing word is not part of the title
+    }
+  });
+
+  test("a title that is only a video game is unaffected: the board game lookup says none or unknown", async () => {
+    for (const title of [{ query: "skyrim", expected: "The Elder Scrolls V: Skyrim" }]) {
+      const slot = withBoard({}, fakeBoard({ status: "none" }));
+      expect((await slot.execute(title.query, makeContext())).title).toBe(title.expected);
+    }
+    expect(withBoard({}, fakeBoard({ status: "none" })).trigger("elden ring")).toBe(true);
+  });
+
+  test("no board game question for a game that is not a confident pick, and none when the plugin would not trigger", async () => {
+    const board = fakeBoard(MATCH);
+    const slot = withBoard({}, board);
+    expect(await slot.execute("zzz nothing", makeContext({ search: [] }))).toEqual(EMPTY);
+    expect(await withBoard({ clientId: "", clientSecret: "" }, board).execute("skyrim", makeContext())).toEqual(EMPTY);
+    expect(board.calls).toHaveLength(0);
+  });
+
+  test("a hidden panel is not cached as 'no game': the IGDB search stays cached, the board decision is asked again", async () => {
+    const board = fakeBoard(MATCH);
+    const slot = withBoard({}, board);
+    const context = makeContext();
+    await slot.execute("skyrim", context);
+    await slot.execute("skyrim", context);
+    expect(searches(context)).toBe(1);
+    expect(board.calls).toHaveLength(2);
+    // when the board game plugin later answers "none", the video game shows without another IGDB search
+    board.lookup = async () => ({ status: "none" });
+    slot.boardLookup = () => board.lookup;
+    expect((await slot.execute("skyrim", context)).title).toBe("The Elder Scrolls V: Skyrim");
+    expect(searches(context)).toBe(1);
+  });
+
+  test("debugMatching logs one line saying which board game won, or why the video game stayed, and no secrets", async () => {
+    const loud = withBoard({ debugMatching: "true" }, fakeBoard(MATCH));
+    const lines = await capture(() => loud.execute("skyrim", makeContext()));
+    expect(lines.filter((line) => line.includes("hidden, a board game matches"))).toEqual(['[game-info] "skyrim" hidden, a board game matches: "Skyrim: The Board Game" (id 900123)']);
+    const stayed = withBoard({ debugMatching: "true" }, fakeBoard({ status: "unknown" }));
+    const other = await capture(() => stayed.execute("skyrim", makeContext()));
+    expect(other.some((line) => line === '[game-info] "skyrim" shown, board game lookup: unknown')).toBe(true);
+    const absent = withBoard({ debugMatching: "true" }, null);
+    expect((await capture(() => absent.execute("skyrim", makeContext()))).some((line) => line.includes("board game lookup"))).toBe(false);
+    for (const line of [...lines, ...other]) {
+      for (const secret of [ID, SECRET, "tok-1", "http"]) expect(line).not.toContain(secret);
+    }
+    // quiet by default
+    const quiet = withBoard({}, fakeBoard(MATCH));
+    expect(await capture(() => quiet.execute("skyrim", makeContext()))).toEqual([]);
+  });
+
+  test("hostile names from the other plugin are cleaned before they reach the log", async () => {
+    const hostile = withBoard({ debugMatching: "true" }, fakeBoard({ status: "match", name: `Bad\n[injected] ${"x".repeat(300)}`, id: "9<script>\n1" }));
+    const lines = await capture(() => hostile.execute("skyrim", makeContext()));
+    const line = lines.find((entry) => entry.includes("hidden"));
+    expect(line.includes("\n")).toBe(false);
+    expect(line).not.toContain("<script>");
+    expect(line.length).toBeLessThan(250);
   });
 });

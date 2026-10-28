@@ -67,6 +67,8 @@ for 7 days (including "none"). Identical simultaneous searches share a request. 
 - **Show ProtonDB compatibility**: on by default. Off makes no ProtonDB requests at all.
 - **Look up the Steam page when IGDB has none**: on by default. Off makes no Steam store requests; the Steam link then only
   appears when IGDB knows the Steam page.
+- **Prefer the board game panel**: on by default. When a board game with the same title matches, the board game panel shows
+  and this one is hidden (see "Board game or video game?" below).
 - **Show a short description**: on by default.
 
 ## The sources, and their terms (please read)
@@ -79,6 +81,38 @@ for 7 days (including "none"). Identical simultaneous searches share a request. 
   optional: ProtonDB can be turned off, and so can the Steam lookup. The Steam link itself is built from a numeric app id,
   never from text in an API reply.
 - Covers are fetched through degoog's own image proxy.
+
+## Board game or video game?
+Some titles are both (a board game with a digital version, or the other way round). By default **the board game wins**: when
+this plugin has a confident video game match and the **Board games** plugin (same degoog) finds a board game with the same
+title, this panel is hidden and only the board game panel shows. So plain `wingspan` shows the board game, while `skyrim` and
+`elden ring` (video games only) and `catan` (a board game only) behave as before.
+
+- **Explicit words win.** A word that can only mean a video game (`ps5`, `ps4`, `xbox`, `switch`, `pc`, `steam`, `video game`,
+  `gameplay`, `walkthrough`, `dlc`, `mods`, `cheats`, `speedrun`, `patch notes`, `system requirements`, `controller`, `console`,
+  `fps`, `remaster(ed)`, `remake`, `rpg`, `roguelike`, `soulslike`) shows this panel and never asks the board game plugin
+  (`wingspan ps5`, `elden ring steam`). A word that can only mean a board game (`board game`, `tabletop`, `rules`, `rulebook`,
+  `setup`, `expansion`, `bgg`, `meeple`, `card game`, `dice game`, `worker placement`, `deck builder`, `how to play`,
+  `player count`, `solo variant`) keeps this panel from showing at all (`wingspan board game`, `catan rules`), unless a
+  video game word is there too.
+- **Ambiguous words decide nothing.** Bare `game`, `guide`, `review`, `wiki`, `trailer`, `release date`, `requirements`,
+  `co-op` and `multiplayer` also fit board games, so `wingspan game` is treated like `wingspan` (the board game wins).
+  The Board games plugin keeps the same lists (a test checks that both plugins classify the same queries the same way).
+- **Setting:** **Prefer the board game panel** (on by default). Off: this plugin never asks, and both panels can show.
+- **Without the Board games plugin** (not installed, disabled, no source usable, or its answer is "unknown") nothing changes:
+  the video game shows.
+- **How it works:** the Board games plugin registers one function in the degoog process
+  (`globalThis[Symbol.for("degoog-extentions.board-games.lookup")]`). This plugin calls it only after it already has a
+  confident pick, waits at most 2.5 s (and never past 70 % of `DEGOOG_SLOT_TIMEOUT_MS`), and only a clear `match` hides the
+  panel. The two plugins share requests and caches, so asking costs nothing extra. Degoog runs slot plugins one after the
+  other, so it does not matter which runs first (`priority`, then folder name).
+- **A cold first search:** if the board game lookup is slower than the wait (recommend.games can need 15 s or more), the video
+  game shows first. The board game's late reply is cached, so the next search for the title shows only the board game.
+- **Troubleshooting:** with **Explain matching in the log** on, the decision is one log line, for example
+  `[game-info] "wingspan" hidden, a board game matches: "Wingspan" (id 266192)` or
+  `[game-info] "wingspan" shown, board game lookup: unknown`.
+- Limit: degoog does not tell a plugin which result tab a panel is shown on, so a board game plugin that is limited to other
+  tabs than this one can still hide this panel.
 
 ## How the match is decided
 A game with the right title is shown when it has **enough ratings for how specific your query is**: a long, distinctive title
@@ -113,7 +147,9 @@ confident match; nothing saved; output refused if it contains a credential):
 - `tests/mock-game-info-server.js` is one local stand-in for all four upstreams (token, IGDB, ProtonDB, Steam), used for
   checking the plugin inside a real degoog container. Give the same base URL to the four overrides:
   `DEGOOG_IGDB_API_BASE` (`.../v4`), `DEGOOG_IGDB_TOKEN_URL` (`.../oauth2/token`), `DEGOOG_PROTONDB_BASE` and
-  `DEGOOG_STEAM_BASE`. It accepts client ID `test-id`, secret `test-secret` and token `test-token`.
+  `DEGOOG_STEAM_BASE`. It accepts client ID `test-id`, secret `test-secret` and token `test-token`. A search for `starfall`
+  also finds an invented video game of that name, the same title as the board game in the board-games mock, to try the
+  "Board game or video game?" rule with both plugins in one degoog.
 - `tests/diagnose-game-info.js` runs one real lookup with your credentials and prints the explain block (see "Troubleshooting").
 - The matching rules and their tuning constants (similarity values, popularity thresholds, accepted IGDB game types) are at
   the top of `match.js`.

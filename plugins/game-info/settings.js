@@ -48,6 +48,15 @@ export const SETTINGS_SCHEMA = [
     description: "Shows the first few sentences of IGDB's summary under the title.",
   },
   {
+    key: "preferBoardGames",
+    fieldset: "Display",
+    label: "Prefer the board game panel",
+    type: "toggle",
+    default: "true",
+    description:
+      "When a board game with the same title matches, show the board game panel and hide this one. Needs the Board games plugin; without it nothing changes. Queries with a video game word (ps5, steam, walkthrough...) always show this panel, and queries with a board game word (board game, rules, tabletop...) never do.",
+  },
+  {
     key: "debugMatching",
     fieldset: "Troubleshooting",
     advanced: true,

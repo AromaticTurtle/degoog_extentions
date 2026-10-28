@@ -16,7 +16,7 @@ import {
   sanitizeTerm,
   steamSearchUrl,
 } from "./request.js";
-import { cacheKey, evaluate, extractTerm, formatExplanation, hasGameWord, looksLikeATitleSearch, normalizeTitle } from "./match.js";
+import { cacheKey, evaluate, extractTerm, formatExplanation, hasGameWord, hasVideoGameWord, isBoardGameQuery, looksLikeATitleSearch, normalizeTitle } from "./match.js";
 import { compactGame, compactProton, compactTimeToBeat } from "./shape.js";
 import { buildPanel } from "./render.js";
 
@@ -30,6 +30,16 @@ const ERROR_PAUSE_MS = 60_000;
 const MIN_SPACING_MS = 300;
 const FALLBACK_TEMPLATE = '<div class="command-result game-info-result">{{content}}</div>';
 const EMPTY = { title: "", html: "" };
+
+// The board-games plugin (same degoog process) registers a lookup function under this symbol; see its README.
+export const BOARD_GAMES_LOOKUP = Symbol.for("degoog-extentions.board-games.lookup");
+const BOARD_WAIT_MAX_MS = 2500;
+const BOARD_WAIT_MIN_MS = 200;
+
+const slotTimeoutMs = () => {
+  const configured = Number.parseInt(process.env.DEGOOG_SLOT_TIMEOUT_MS ?? "", 10);
+  return Number.isFinite(configured) && configured > 0 ? configured : 10_000;
+};
 const LABELS = { igdb: "IGDB", protondb: "ProtonDB", steam: "Steam" };
 const PC_PLATFORM = /\b(?:pc|windows|linux|mac|macos)\b/i;
 
@@ -70,6 +80,11 @@ export class GameInfoSlot {
   steamFallback = true;
   showDescription = true;
   debugMatching = false;
+  preferBoardGames = true;
+  // degoog gives a slot 10 s (DEGOOG_SLOT_TIMEOUT_MS). The wait for the board game answer never ends after 70 % of it,
+  // which leaves the rest for the IGDB follow-up requests.
+  startWindowMs = Math.max(1000, Math.round(slotTimeoutMs() * 0.7));
+  boardLookup = () => globalThis[BOARD_GAMES_LOOKUP];
   apiBase = process.env.DEGOOG_IGDB_API_BASE || DEFAULT_API_BASE;
   tokenUrl = process.env.DEGOOG_IGDB_TOKEN_URL || DEFAULT_TOKEN_URL;
   protonBase = process.env.DEGOOG_PROTONDB_BASE || DEFAULT_PROTONDB_BASE;
@@ -100,6 +115,7 @@ export class GameInfoSlot {
     this.steamFallback = truthy(settings.steamFallback, true);
     this.showDescription = truthy(settings.showDescription, true);
     this.debugMatching = truthy(settings.debugMatching, false);
+    this.preferBoardGames = truthy(settings.preferBoardGames, true);
   }
 
   isPaused(upstream) {
@@ -115,6 +131,7 @@ export class GameInfoSlot {
     if (!this.clientId || !this.clientSecret) return "no Twitch client id and secret are set";
     if (this.paused) return "IGDB is paused after an error";
     if (!looksLikeATitleSearch(query)) return "not a title search";
+    if (isBoardGameQuery(query)) return "the query has a board game word and no video game word";
     if (this.requireGameWord && !hasGameWord(query)) return "requireGameWord is on and the query has no game word";
     return "";
   }
@@ -299,7 +316,39 @@ export class GameInfoSlot {
     });
   }
 
+  // Does a board game with the same title match? Only asked after this plugin has a confident pick, never for a query with a
+  // video-game-specific word, and never longer than the time left. Anything but a clear "match" keeps the video game.
+  async _boardGameWins(query, term, context, startedAt) {
+    if (!this.preferBoardGames || hasVideoGameWord(query)) return false;
+    const lookup = this.boardLookup();
+    if (typeof lookup !== "function") return false;
+    const waitMs = Math.min(BOARD_WAIT_MAX_MS, startedAt + this.startWindowMs - this.now());
+    let outcome = { status: "unknown" };
+    if (waitMs >= BOARD_WAIT_MIN_MS) {
+      let timer;
+      const late = new Promise((resolve) => {
+        timer = setTimeout(() => resolve(null), waitMs + 100);
+      });
+      try {
+        const answer = await Promise.race([Promise.resolve(lookup({ term, deadlineMs: waitMs, context })), late]);
+        if (answer && typeof answer === "object") outcome = answer;
+      } catch {
+        /* the video game stays */
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    if (this.debugMatching) {
+      const name = String(outcome.name ?? "").replace(/\s+/g, " ").trim().slice(0, 70);
+      const id = String(outcome.id ?? "").replace(/[^0-9A-Za-z_-]/g, "").slice(0, 20);
+      const label = outcome.status === "match" ? `hidden, a board game matches: "${name}" (id ${id})` : `shown, board game lookup: ${outcome.status === "none" ? "none" : "unknown"}`;
+      console.info(`[game-info] "${String(query).replace(/\s+/g, " ").trim().slice(0, 100)}" ${label}`);
+    }
+    return outcome.status === "match";
+  }
+
   async execute(query, context) {
+    const startedAt = this.now();
     if (!this.trigger(query)) return EMPTY;
     const term = extractTerm(query);
     if (sanitizeTerm(term).length < 2) return EMPTY;
@@ -311,6 +360,7 @@ export class GameInfoSlot {
       if (this.debugMatching) console.info(formatExplanation(query, term, intent, result));
       const game = result.pick;
       if (!game) return EMPTY;
+      if (await this._boardGameWins(query, term, context, startedAt)) return EMPTY;
       const [ttb, steamAppId] = await Promise.all([this._timeToBeat(game.id, context), this._steamAppId(game, context)]);
       const proton = this.showProtonDb && steamAppId ? await this._proton(steamAppId, context) : null;
       const html = buildPanel({
