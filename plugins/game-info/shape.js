@@ -70,6 +70,7 @@ export const compactGame = (game) => ({
   id: Math.trunc(number(game?.id)),
   slug: text(game?.slug, 120),
   name: text(game?.name, 200),
+  alternatives: names(game?.alternative_names, (entry) => entry?.name, 10),
   summary: text(game?.summary, SUMMARY_LIMIT),
   released: isoDate(game?.first_release_date),
   gameType: gameTypeName(game?.game_type),

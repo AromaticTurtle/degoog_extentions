@@ -16,7 +16,7 @@ import {
   sanitizeTerm,
   steamSearchUrl,
 } from "./request.js";
-import { cacheKey, extractTerm, hasGameWord, looksLikeATitleSearch, normalizeTitle, pickGame } from "./match.js";
+import { cacheKey, evaluate, extractTerm, formatExplanation, hasGameWord, looksLikeATitleSearch, normalizeTitle } from "./match.js";
 import { compactGame, compactProton, compactTimeToBeat } from "./shape.js";
 import { buildPanel } from "./render.js";
 
@@ -69,6 +69,7 @@ export class GameInfoSlot {
   showProtonDb = true;
   steamFallback = true;
   showDescription = true;
+  debugMatching = false;
   apiBase = process.env.DEGOOG_IGDB_API_BASE || DEFAULT_API_BASE;
   tokenUrl = process.env.DEGOOG_IGDB_TOKEN_URL || DEFAULT_TOKEN_URL;
   protonBase = process.env.DEGOOG_PROTONDB_BASE || DEFAULT_PROTONDB_BASE;
@@ -98,6 +99,7 @@ export class GameInfoSlot {
     this.showProtonDb = truthy(settings.showProtonDb, true);
     this.steamFallback = truthy(settings.steamFallback, true);
     this.showDescription = truthy(settings.showDescription, true);
+    this.debugMatching = truthy(settings.debugMatching, false);
   }
 
   isPaused(upstream) {
@@ -108,11 +110,22 @@ export class GameInfoSlot {
     return this.isPaused("igdb");
   }
 
+  // Why a query does not get a lookup ("" when it does).
+  _rejection(query) {
+    if (!this.clientId || !this.clientSecret) return "no Twitch client id and secret are set";
+    if (this.paused) return "IGDB is paused after an error";
+    if (!looksLikeATitleSearch(query)) return "not a title search";
+    if (this.requireGameWord && !hasGameWord(query)) return "requireGameWord is on and the query has no game word";
+    return "";
+  }
+
+  // With debugMatching a title-like query that is turned away is logged with the rule that did it.
   trigger(query) {
-    if (!this.clientId || !this.clientSecret || this.paused) return false;
-    if (!looksLikeATitleSearch(query)) return false;
-    if (this.requireGameWord && !hasGameWord(query)) return false;
-    return true;
+    const why = this._rejection(query);
+    if (why && this.debugMatching && why !== "not a title search" && looksLikeATitleSearch(query)) {
+      console.info(`[game-info] "${String(query).replace(/\s+/g, " ").trim().slice(0, 100)}" skipped: ${why}`);
+    }
+    return !why;
   }
 
   _cache(context, name, ttlMs) {
@@ -292,7 +305,11 @@ export class GameInfoSlot {
     if (sanitizeTerm(term).length < 2) return EMPTY;
     try {
       const results = await this._search(term, context);
-      const game = results && pickGame(term, results, hasGameWord(query));
+      if (!results) return EMPTY;
+      const intent = hasGameWord(query);
+      const result = evaluate(term, results, intent, { explain: this.debugMatching });
+      if (this.debugMatching) console.info(formatExplanation(query, term, intent, result));
+      const game = result.pick;
       if (!game) return EMPTY;
       const [ttb, steamAppId] = await Promise.all([this._timeToBeat(game.id, context), this._steamAppId(game, context)]);
       const proton = this.showProtonDb && steamAppId ? await this._proton(steamAppId, context) : null;

@@ -90,4 +90,14 @@ export const SETTINGS_SCHEMA = [
     description:
       "Stops calling BGG's website API (and Wikidata, which it uses to find ids) once this many requests were made in a UTC day. 0 turns it off. The count is kept in data/bgg/usage-geekdo.json.",
   },
+  {
+    key: "debugMatching",
+    fieldset: "Troubleshooting",
+    advanced: true,
+    label: "Explain matching in the log",
+    type: "toggle",
+    default: "false",
+    description:
+      "On: every lookup writes one block to the server log that shows which source answered, the candidates it returned, how well each title fits, the rating counts, and why the panel showed or not. Rejected title-like queries get one line saying which rule rejected them, and a lookup that is still running when the time is up says so. Only the query text and game names are logged, never the token. Off by default.",
+  },
 ];

@@ -10,7 +10,7 @@ import {
   retryAfterMs,
   sanitizeTerm,
 } from "./request.js";
-import { cacheKey, isOtherMediaQuery, looksLikeATitleSearch, parseQuery, pickBook } from "./match.js";
+import { cacheKey, evaluate, formatExplanation, isOtherMediaQuery, looksLikeATitleSearch, parseQuery } from "./match.js";
 import { REPLY_MAX_CHARS, parseSearchReply } from "./shape.js";
 import { buildPanel } from "./render.js";
 
@@ -63,6 +63,7 @@ export class BooksSlot {
   apiToken = "";
   requireBookWord = false;
   showDescription = true;
+  debugMatching = false;
   apiUrl = process.env.DEGOOG_HARDCOVER_API_URL || DEFAULT_API_URL;
   now = Date.now;
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -89,6 +90,7 @@ export class BooksSlot {
     this.apiToken = normalizeToken(uiToken ? settings.apiToken : process.env.HARDCOVER_API_TOKEN);
     this.requireBookWord = truthy(settings.requireBookWord, false);
     this.showDescription = truthy(settings.showDescription, true);
+    this.debugMatching = truthy(settings.debugMatching, false);
     const limit = Number.parseInt(String(settings.dailyRequestLimit ?? ""), 10);
     this.budget.cap = Number.isFinite(limit) && limit >= 0 ? limit : DEFAULT_DAILY_LIMIT;
   }
@@ -97,12 +99,24 @@ export class BooksSlot {
     return this.now() < this._pausedUntil;
   }
 
+  // Why a query does not get a lookup ("" when it does). A title-like query rejected here is logged with debugMatching.
+  _rejection(query) {
+    if (!this.apiToken) return "no API token is set";
+    if (this.paused) return "Hardcover is paused after an error";
+    if (this.budget.exhausted) return "the daily request limit is reached";
+    if (!looksLikeATitleSearch(query)) return "not a title search";
+    if (isOtherMediaQuery(query)) return "the query has a video game or board game word and no book word";
+    if (this.requireBookWord && !parseQuery(query).intent) return "requireBookWord is on and the query has no book word";
+    return "";
+  }
+
+  // With debugMatching a title-like query that is turned away is logged with the rule that did it.
   trigger(query) {
-    if (!this.apiToken || this.paused || this.budget.exhausted) return false;
-    if (!looksLikeATitleSearch(query)) return false;
-    if (isOtherMediaQuery(query)) return false;
-    if (this.requireBookWord && !parseQuery(query).intent) return false;
-    return true;
+    const why = this._rejection(query);
+    if (why && this.debugMatching && why !== "not a title search" && looksLikeATitleSearch(query)) {
+      console.info(`[books] "${String(query).replace(/\s+/g, " ").trim().slice(0, 100)}" skipped: ${why}`);
+    }
+    return !why;
   }
 
   _cache(context, name, ttlMs) {
@@ -248,7 +262,10 @@ export class BooksSlot {
     const deadline = this.now() + this.startWindowMs;
     try {
       const books = await this._search(parsed.search, context, deadline);
-      const book = books && pickBook(parsed, books);
+      if (!books) return EMPTY;
+      const result = evaluate(parsed, books, { explain: this.debugMatching });
+      if (this.debugMatching) console.info(formatExplanation(query, parsed, result));
+      const book = result.pick;
       if (!book) return EMPTY;
       const html = buildPanel({
         book,

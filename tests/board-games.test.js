@@ -26,25 +26,29 @@ import {
 import { attrOf, childrenOf, decodeEntities, decodeHtmlEntities, firstChild, parseXml, scanXml } from "../plugins/board-games/xml.js";
 import { blankGame, cleanDescription, compactThing, formatPlayerList, parseThings, scanSearch } from "../plugins/board-games/shape.js";
 import {
+  BARS,
   CANDIDATE_MIN_SIMILARITY,
-  EXACT_MIN_RATINGS,
   INTENT_LOOSE_MIN_RATINGS,
   INTENT_MIN_RATINGS,
-  PREFIX_MIN_RATINGS,
   SUBTITLE_EXACT,
-  SUBTITLE_MIN_RATINGS,
   cacheKey,
+  evaluate,
   extractTerm,
+  formatExplanation,
   hasBoardGameWord,
   hasVideoGameWord,
   isAcceptedType,
   isConfidentMatch,
   isVideoGameQuery,
+  judge,
   looksLikeATitleSearch,
   normalizeTitle,
   pickGame,
   popularity,
   rankCandidates,
+  scoreGame,
+  specificity,
+  stripDecorations,
   subtitles,
   titleSimilarity,
 } from "../plugins/board-games/match.js";
@@ -633,22 +637,22 @@ describe("title matching", () => {
   });
 
   test("confidence needs enough ratings, and a board game word lowers the bar", () => {
-    expect(EXACT_MIN_RATINGS).toBe(200);
-    expect(PREFIX_MIN_RATINGS).toBe(1500);
-    expect(SUBTITLE_MIN_RATINGS).toBe(3000);
+    // "risk" is a low-specificity query: the strictest bars apply.
+    expect([BARS.exact.low, BARS.prefix.low, BARS.subtitle.low]).toEqual([400, 2500, 4000]);
     const exact = (n) => rated(1, "Risk", n);
-    expect(isConfidentMatch("risk", exact(200), false)).toBe(true);
-    expect(isConfidentMatch("risk", exact(199), false)).toBe(false);
+    expect(isConfidentMatch("risk", exact(400), false)).toBe(true);
+    expect(isConfidentMatch("risk", exact(399), false)).toBe(false);
     expect(isConfidentMatch("risk", exact(49), true)).toBe(false);
     expect(isConfidentMatch("risk", exact(INTENT_MIN_RATINGS), true)).toBe(true);
     const prefix = (n) => rated(1, "Risk: Legacy", n);
-    expect(isConfidentMatch("risk", prefix(1500), false)).toBe(true);
-    expect(isConfidentMatch("risk", prefix(1499), false)).toBe(false);
+    expect(isConfidentMatch("risk", prefix(2500), false)).toBe(true);
+    expect(isConfidentMatch("risk", prefix(2499), false)).toBe(false);
     expect(isConfidentMatch("risk", prefix(50), true)).toBe(true);
     expect(isConfidentMatch("risk", prefix(49), true)).toBe(false);
     const subtitle = (n) => rated(1, "Gloomhaven: Jaws of the Lion", n);
-    expect(isConfidentMatch("jaws of the lion", subtitle(3000), false)).toBe(true);
-    expect(isConfidentMatch("jaws of the lion", subtitle(2999), false)).toBe(false);
+    // "jaws of the lion" is a high-specificity query, so a subtitle match needs BARS.subtitle.high
+    expect(isConfidentMatch("jaws of the lion", subtitle(BARS.subtitle.high), false)).toBe(true);
+    expect(isConfidentMatch("jaws of the lion", subtitle(BARS.subtitle.high - 1), false)).toBe(false);
     expect(isConfidentMatch("jaws of the lion", subtitle(INTENT_LOOSE_MIN_RATINGS), true)).toBe(true);
     expect(isConfidentMatch("jaws of the lion", subtitle(INTENT_LOOSE_MIN_RATINGS - 1), true)).toBe(false);
     expect(isConfidentMatch("risk", null, true)).toBe(false);
@@ -667,13 +671,16 @@ describe("title matching", () => {
   });
 
   test("a game with few ratings needs a board game word", () => {
-    const obscure = [rated(1, "Obscure Game", 150)];
+    const obscure = [rated(1, "Obscure Game", 99)];
     expect(pickGame("obscure game", obscure, false)).toBeNull();
     expect(pickGame("obscure game", obscure, true).id).toBe("1");
     expect(pickGame("obscure game", [rated(1, "Obscure Game", 49)], true)).toBeNull();
     // Without a board game word the popular base game stands in for an unpopular exact title; with one, the exact title wins.
-    expect(pickGame("starfall legacy", THINGS, false).id).toBe("900001");
-    expect(pickGame("starfall legacy", THINGS, true).id).toBe("900004");
+    const fewRatings = THINGS.map((game) => (game.id === "900004" ? { ...game, ratingCount: 15 } : game));
+    expect(pickGame("starfall legacy", fewRatings, false).id).toBe("900001");
+    expect(pickGame("starfall legacy", fewRatings, true).id).toBe("900001"); // 15 ratings are below every bar
+    // "starfall legacy" is a long, distinctive query: 85 ratings are enough for an exact title without a keyword
+    expect(pickGame("starfall legacy", THINGS, false).id).toBe("900004");
   });
 
   test("expansions and other item types are never the answer", () => {
@@ -699,10 +706,11 @@ describe("title matching", () => {
 
   test("generic single words need the higher thresholds", () => {
     expect(pickGame("risk", [rated(1, "Risk", 150)], false)).toBeNull();
-    expect(pickGame("risk", [rated(1, "Risk", 250)], false).id).toBe("1");
+    expect(pickGame("risk", [rated(1, "Risk", 250)], false)).toBeNull();
+    expect(pickGame("risk", [rated(1, "Risk", 400)], false).id).toBe("1");
     expect(pickGame("risk", [rated(1, "Risk", 60)], true).id).toBe("1");
     expect(pickGame("risk", [rated(1, "Risk Legacy", 1000)], false)).toBeNull();
-    expect(pickGame("risk", [rated(1, "Risk Legacy", 2000)], false).id).toBe("1");
+    expect(pickGame("risk", [rated(1, "Risk Legacy", 2500)], false).id).toBe("1");
   });
 
   test("series and subtitles: gloomhaven versus its spin-off", () => {
@@ -1059,7 +1067,8 @@ describe("the slot", () => {
   test("an unconfident match shows nothing unless the query names board games", async () => {
     const slot = make();
     const context = makeContext();
-    expect((await slot.execute("starfall legacy", context)).title).toBe("Starfall");
+    // a long, distinctive title needs few ratings: Starfall Legacy (85) shows without a board game word
+    expect((await slot.execute("starfall legacy", context)).title).toBe("Starfall Legacy");
     expect((await slot.execute("starfall legacy board game", context)).title).toBe("Starfall Legacy");
 
   });

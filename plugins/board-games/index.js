@@ -1,6 +1,6 @@
 import { SETTINGS_SCHEMA } from "./settings.js";
 import { sanitizeTerm } from "./request.js";
-import { extractTerm, hasBoardGameWord, isVideoGameQuery, looksLikeATitleSearch } from "./match.js";
+import { evaluate, extractTerm, formatExplanation, hasBoardGameWord, isVideoGameQuery, looksLikeATitleSearch } from "./match.js";
 import { buildPanel } from "./render.js";
 import { BggApiSource } from "./sources/bgg-api.js";
 import { RecommendGamesSource } from "./sources/recommend-games.js";
@@ -9,6 +9,7 @@ import { BggInternalSource } from "./sources/bgg-internal.js";
 const MIN_SPACING_MS = 1000;
 const FALLBACK_TEMPLATE = '<div class="command-result board-games-result">{{content}}</div>';
 const EMPTY = { title: "", html: "" };
+const TIMED_OUT = Symbol("timed out");
 
 const truthy = (value, fallback) => (value === undefined || value === "" ? fallback : value === true || value === "true");
 
@@ -57,11 +58,15 @@ export class BoardGamesSlot {
 
   requireBoardGameWord = false;
   showDescription = true;
+  debugMatching = false;
   now = Date.now;
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   spacingMs = MIN_SPACING_MS;
   // degoog gives a slot 10 s (DEGOOG_SLOT_TIMEOUT_MS). No request is started after 70 % of it, in the whole chain.
   startWindowMs = Math.max(1000, Math.round(slotTimeoutMs() * 0.7));
+  // A lookup that is still running shortly before degoog's own timeout is given up on for this search. The request
+  // itself is not cancelled: its reply is cached when it arrives, so the next search for the same title is instant.
+  answerWindowMs = Math.max(500, Math.round(slotTimeoutMs() * 0.95));
 
   template = FALLBACK_TEMPLATE;
   _signProxy = null;
@@ -102,14 +107,32 @@ export class BoardGamesSlot {
     });
     this.requireBoardGameWord = truthy(settings.requireBoardGameWord, false);
     this.showDescription = truthy(settings.showDescription, true);
+    this.debugMatching = truthy(settings.debugMatching, false);
   }
 
+  // Why a query does not get a lookup ("" when it does).
+  _rejection(query) {
+    if (!this.chain.some((source) => source.usable())) return "no source is usable (disabled, no token, paused or over its limit)";
+    if (!looksLikeATitleSearch(query)) return "not a title search";
+    if (isVideoGameQuery(query)) return "the query has a video game word and no board game word";
+    if (this.requireBoardGameWord && !hasBoardGameWord(query)) return "requireBoardGameWord is on and the query has no board game word";
+    return "";
+  }
+
+  // With debugMatching a title-like query that is turned away is logged with the rule that did it.
   trigger(query) {
-    if (!this.chain.some((source) => source.usable())) return false;
-    if (!looksLikeATitleSearch(query)) return false;
-    if (isVideoGameQuery(query)) return false;
-    if (this.requireBoardGameWord && !hasBoardGameWord(query)) return false;
-    return true;
+    const why = this._rejection(query);
+    if (why && this.debugMatching && why !== "not a title search" && looksLikeATitleSearch(query)) {
+      console.info(`[board-games] "${String(query).replace(/\s+/g, " ").trim().slice(0, 100)}" skipped: ${why}`);
+    }
+    return !why;
+  }
+
+  // The sources hand their candidate games here: the confident pick (or null), with the explain block when debugging.
+  decide({ query, term, intent, games, source, rankBonus = false }) {
+    const result = evaluate(term, games, intent, { explain: this.debugMatching, rankBonus });
+    if (this.debugMatching) console.info(formatExplanation(query ?? term, term, intent, result, source));
+    return result.pick;
   }
 
   // What the sources need from the slot: a cache (degoog's, or a local one) and in-flight de-duplication.
@@ -127,14 +150,14 @@ export class BoardGamesSlot {
     return this._inflight.get(id);
   }
 
-  async _find({ term, intent, context, deadline }) {
+  async _find({ term, intent, context, deadline, query }) {
     let hints = {};
     for (const source of this.chain) {
       if (this.now() >= deadline) return null;
       if (!source.usable()) continue;
       let result;
       try {
-        result = await source.lookup({ term, intent, context, deadline, hints });
+        result = await source.lookup({ term, intent, context, deadline, hints, query });
       } catch {
         result = { status: "unavailable", reason: "error" };
       }
@@ -150,7 +173,24 @@ export class BoardGamesSlot {
     if (sanitizeTerm(term).length < 2) return EMPTY;
     const deadline = this.now() + this.startWindowMs;
     try {
-      const game = await this._find({ term, intent: hasBoardGameWord(query), context, deadline });
+      const work = this._find({ term, intent: hasBoardGameWord(query), context, deadline, query });
+      let timer;
+      const late = new Promise((resolve) => {
+        timer = setTimeout(() => resolve(TIMED_OUT), this.answerWindowMs);
+      });
+      let game;
+      try {
+        game = await Promise.race([work, late]);
+      } finally {
+        clearTimeout(timer);
+      }
+      if (game === TIMED_OUT) {
+        work.catch(() => {});
+        if (this.debugMatching) {
+          console.info(`[board-games] "${String(query).replace(/\s+/g, " ").trim().slice(0, 100)}" is still being looked up; the reply is cached when it arrives, so searching again in a moment shows the panel`);
+        }
+        return EMPTY;
+      }
       if (!game) return EMPTY;
       const html = buildPanel({
         game,

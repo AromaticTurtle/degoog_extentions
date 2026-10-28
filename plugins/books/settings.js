@@ -37,4 +37,14 @@ export const SETTINGS_SCHEMA = [
     description:
       "Stops calling Hardcover once this many requests were made in a UTC day. Hardcover's free plan allows 5,000 a day and 60 a minute, so the default leaves plenty of room. 0 turns the guard off. The count is kept in data/hardcover/usage.json.",
   },
+  {
+    key: "debugMatching",
+    fieldset: "Troubleshooting",
+    advanced: true,
+    label: "Explain matching in the log",
+    type: "toggle",
+    default: "false",
+    description:
+      "On: every lookup writes one block to the server log that shows the candidates Hardcover returned, how well each title fits, the popularity numbers, and why the panel showed or not. Rejected title-like queries get one line saying which rule rejected them. Only the query text and catalog titles are logged, never the token. Off by default.",
+  },
 ];

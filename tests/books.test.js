@@ -26,30 +26,35 @@ import {
 } from "../plugins/books/request.js";
 import { cleanDescription, compactBook, extractDocuments, parseSearchReply } from "../plugins/books/shape.js";
 import {
-  EXACT_MIN_USERS,
-  INTENT_LOOSE_MIN_USERS,
-  INTENT_MIN_USERS,
-  PREFIX_MIN_USERS,
+  BARS,
+  INTENT_LOOSE_MIN_POPULARITY,
+  INTENT_MIN_POPULARITY,
+  SERIES_SIMILARITY,
   STRIPPED_TITLE_SIMILARITY,
   SUBTITLE_EXACT,
-  SUBTITLE_MIN_USERS,
   cacheKey,
+  evaluate,
   extractTerm,
+  formatExplanation,
   hasBookWord,
   hasOtherMediaWord,
   isConfident,
   isOtherMediaQuery,
+  judge,
   looksLikeATitleSearch,
   normalizeTitle,
   parseQuery,
   pickBook,
   popularity,
   scoreBook,
+  specificity,
+  stripDecorations,
   subtitles,
   titlePart,
   titleSimilarity,
 } from "../plugins/books/match.js";
 import { buildPanel, esc, formatsText, summarize } from "../plugins/books/render.js";
+import { SETTINGS_SCHEMA } from "../plugins/books/settings.js";
 import { BooksSlot, slot as defaultSlot } from "../plugins/books/index.js";
 
 const fixtureText = await Bun.file(new URL("./fixtures/hardcover-search.json", import.meta.url)).text();
@@ -229,6 +234,11 @@ describe("shaping Hardcover documents", () => {
       ratingsCount: 3100,
       readers: 4200,
       saved: 5400,
+      listsCount: 800,
+      reviewsCount: 900,
+      seriesName: "Orchard Cycle",
+      seriesNames: ["Orchard Cycle"],
+      seriesPosition: 1,
       compilation: false,
       hasAudiobook: true,
       hasEbook: true,
@@ -245,7 +255,7 @@ describe("shaping Hardcover documents", () => {
       expect(everything).not.toContain(forbidden);
     }
     expect(Object.keys(GLASS).sort()).toEqual(
-      ["alternatives", "audioHours", "authors", "compilation", "description", "genres", "hasAudiobook", "hasEbook", "id", "image", "isbn", "moods", "pages", "rating", "ratingsCount", "readers", "saved", "series", "slug", "subtitle", "title", "year"].sort(),
+      ["alternatives", "audioHours", "authors", "compilation", "description", "genres", "hasAudiobook", "hasEbook", "id", "image", "isbn", "listsCount", "moods", "pages", "rating", "ratingsCount", "readers", "reviewsCount", "saved", "series", "seriesName", "seriesNames", "seriesPosition", "slug", "subtitle", "title", "year"].sort(),
     );
   });
 
@@ -485,24 +495,31 @@ describe("title matching", () => {
   });
 
   test("confidence needs enough readers, and a book word lowers the bar", () => {
-    expect([EXACT_MIN_USERS, PREFIX_MIN_USERS, SUBTITLE_MIN_USERS, INTENT_MIN_USERS, INTENT_LOOSE_MIN_USERS]).toEqual([20, 200, 1000, 3, 60]);
-    expect(isConfident(1, 20, false)).toBe(true);
-    expect(isConfident(1, 19, false)).toBe(false);
+    // A low-specificity (one short word) query keeps the old, strict bars.
+    expect([BARS.exact.low, BARS.prefix.low, BARS.subtitle.low, INTENT_MIN_POPULARITY, INTENT_LOOSE_MIN_POPULARITY]).toEqual([1000, 2000, 5000, 3, 60]);
+    expect(isConfident(1, 1000, false)).toBe(true);
+    expect(isConfident(1, 999, false)).toBe(false);
     expect(isConfident(1, 2, true)).toBe(false);
     expect(isConfident(1, 3, true)).toBe(true);
-    expect(isConfident(0.9, 200, false)).toBe(true);
-    expect(isConfident(0.9, 199, false)).toBe(false);
+    expect(isConfident(0.9, 2000, false)).toBe(true);
+    expect(isConfident(0.9, 1999, false)).toBe(false);
     expect(isConfident(0.9, 3, true)).toBe(true);
-    expect(isConfident(SUBTITLE_EXACT, 1000, false)).toBe(true);
-    expect(isConfident(SUBTITLE_EXACT, 999, false)).toBe(false);
+    expect(isConfident(SUBTITLE_EXACT, 5000, false)).toBe(true);
+    expect(isConfident(SUBTITLE_EXACT, 4999, false)).toBe(false);
     expect(isConfident(SUBTITLE_EXACT, 60, true)).toBe(true);
     expect(isConfident(SUBTITLE_EXACT, 59, true)).toBe(false);
     expect(isConfident(0.8, 60, true)).toBe(true);
     expect(isConfident(0.8, 59, true)).toBe(false);
     expect(isConfident(0.79, 99999, true)).toBe(false);
+  });
+
+  test("popularity is the strongest of several signals, and one missing signal never hides a book", () => {
     expect(popularity({ saved: 12 })).toBe(12);
     expect(popularity({ saved: "x" })).toBe(0);
     expect(popularity(null)).toBe(0);
+    expect(popularity({ saved: 0, readers: 0, ratingsCount: 500 })).toBe(1000);
+    expect(popularity({ saved: null, readers: undefined, listsCount: 40, reviewsCount: 3 })).toBe(80);
+    expect(popularity({ saved: 5000, ratingsCount: 3 })).toBe(5000);
   });
 
   test("picks the right book from the fixture", () => {
@@ -549,17 +566,22 @@ describe("title matching", () => {
 
   test("generic single words need the higher thresholds", () => {
     expect(pickBook(parsed("ring"), [book("Ring", 15)])).toBeNull();
-    expect(pickBook(parsed("ring"), [book("Ring", 25)])?.title).toBe("Ring");
+    expect(pickBook(parsed("ring"), [book("Ring", 25)])).toBeNull();
+    expect(pickBook(parsed("ring"), [book("Ring", 499)])).toBeNull();
+    // the first result of the list that matches exactly needs half of the bar (1000)
+    expect(pickBook(parsed("ring"), [book("Ring", 500)])?.title).toBe("Ring");
+    expect(pickBook(parsed("ring"), [book("Other", 9), book("Ring", 500)])).toBeNull();
+    expect(pickBook(parsed("ring"), [book("Other", 9), book("Ring", 1000)])?.title).toBe("Ring");
     expect(pickBook(parsed("ring"), [book("Ring", 4)])).toBeNull();
     expect(pickBook(parsed("ring novel"), [book("Ring", 4)])?.title).toBe("Ring");
-    expect(pickBook(parsed("ring"), [book("Ring of Fire", 150)])).toBeNull();
-    expect(pickBook(parsed("ring"), [book("Ring of Fire", 250)])?.title).toBe("Ring of Fire");
+    expect(pickBook(parsed("ring"), [book("Ring of Fire", 900)])).toBeNull();
+    expect(pickBook(parsed("ring"), [book("Ring of Fire", 1000)])?.title).toBe("Ring of Fire");
     expect(pickBook(parsed("ring"), [book("The One Ring Companion", 5000)])).toBeNull();
   });
 
-  test("a series name shows the series entry only when nothing else fits, never a compilation first", () => {
-    expect(pickBook(parsed("orchard cycle"), BOOKS)?.id).toBe("9001003");
-    const plain = book("Dune", 100, { id: "1" });
+  test("a series name shows the first book of the series, never a compilation first", () => {
+    expect(pickBook(parsed("orchard cycle"), BOOKS)?.id).toBe("9001001");
+    const plain = book("Dune", 3000, { id: "1" });
     const compilation = book("Dune", 9000, { id: "2", compilation: true });
     expect(pickBook(parsed("dune"), [compilation, plain])?.id).toBe("1");
     expect(pickBook(parsed("dune"), [compilation])?.id).toBe("2");
@@ -567,13 +589,13 @@ describe("title matching", () => {
   });
 
   test("the closest title wins, then one with a release year, then the most saved", () => {
-    const exact = book("Hanabi", 300, { id: "1" });
-    const prefix = book("Hanabi Nights", 9000, { id: "2" });
+    const exact = book("Hanabi", 3000, { id: "1" });
+    const prefix = book("Hanabi Nights", 90000, { id: "2" });
     expect(pickBook(parsed("hanabi"), [prefix, exact])?.id).toBe("1");
     const noYear = book("Hanabi", 9000, { id: "3", year: 0 });
-    const withYear = book("Hanabi", 100, { id: "4", year: 1990 });
+    const withYear = book("Hanabi", 3000, { id: "4", year: 1990 });
     expect(pickBook(parsed("hanabi"), [noYear, withYear])?.id).toBe("4");
-    const popular = book("Hanabi", 900, { id: "5", year: 1991 });
+    const popular = book("Hanabi", 9900, { id: "5", year: 1991 });
     expect(pickBook(parsed("hanabi"), [withYear, popular])?.id).toBe("5");
   });
 
@@ -1186,5 +1208,274 @@ describe("secrets", () => {
       expect(call.url).not.toContain(TOKEN);
       expect(String(call.init.body)).not.toContain(TOKEN);
     }
+  });
+});
+
+// --- Decision quality: regression tests (invented titles, shaped like the real "popular series, book 1" case) ---
+
+// A Hardcover document for an invented series "Cellar Delver Ned" by an invented author.
+const delver = (extra = {}) =>
+  compactBook({
+    id: 7100001,
+    title: "Cellar Delver Ned",
+    author_names: ["Pip Hollow"],
+    release_year: 2020,
+    pages: 440,
+    users_count: 60_000,
+    users_read_count: 30_000,
+    ratings_count: 40_000,
+    featured_series: { series: { name: "Cellar Delver Ned" }, position: 1 },
+    featured_series_position: 1,
+    series_names: ["Cellar Delver Ned"],
+    ...extra,
+  });
+const pickIds = (query, books) => pickBook(parseQuery(query), books)?.id ?? null;
+
+describe("specificity bands and suffix normalisation", () => {
+  test("one short word is low, one long word or two words medium, three words or 14+ characters high", () => {
+    expect(specificity("dune")).toBe("low");
+    expect(specificity("carl")).toBe("low");
+    expect(specificity("root")).toBe("low");
+    expect(specificity("wingspan")).toBe("medium");
+    expect(specificity("the road")).toBe("medium");
+    expect(specificity("gone girl")).toBe("medium");
+    expect(specificity("project hail mary")).toBe("high");
+    expect(specificity("cellar delver ned")).toBe("high");
+    expect(specificity("extraordinarily")).toBe("high");
+    expect(specificity("Dune (Dune, #1)")).toBe("low");
+    expect(specificity("")).toBe("low");
+  });
+
+  test("series markers and edition marks are ignored on both sides", () => {
+    expect(stripDecorations("Cellar Delver Ned (Cellar Delver Ned, #1)")).toBe("Cellar Delver Ned");
+    expect(stripDecorations("Dune: A Novel")).toBe("Dune");
+    expect(stripDecorations("Title, Book One")).toBe("Title");
+    expect(stripDecorations("Title #1")).toBe("Title");
+    expect(stripDecorations("Title #3")).toBe("Title #3"); // another book of the series is not the bare title
+    expect(stripDecorations("Title (Special Edition)")).toBe("Title");
+    expect(stripDecorations("Title: Anniversary Edition")).toBe("Title");
+    expect(stripDecorations("Title Remastered")).toBe("Title");
+    expect(stripDecorations("(Just Brackets)")).toBe("(Just Brackets)");
+    expect(stripDecorations("")).toBe("");
+    expect(titleSimilarity("cellar delver ned", "Cellar Delver Ned (Cellar Delver Ned, #1)")).toBe(1);
+    expect(titleSimilarity("cellar delver ned (book 1)", "Cellar Delver Ned")).toBe(1);
+    expect(titleSimilarity("dune a novel", "Dune")).toBe(1);
+    expect(titleSimilarity("dune deluxe edition", "Dune")).toBe(1);
+    expect(titleSimilarity("dune", "Dune (Deluxe Edition)")).toBe(1);
+  });
+
+  test("the numeral rule still holds after stripping", () => {
+    expect(titleSimilarity("dune 2", "Dune")).toBeLessThan(0.9);
+    expect(titleSimilarity("dune #2", "Dune")).toBeLessThan(0.9);
+    expect(titleSimilarity("cellar delver ned 2", "Cellar Delver Ned")).toBeLessThan(0.9);
+  });
+
+  test("specificity lowers the popularity needed for an exact title", () => {
+    expect(BARS.exact.high).toBeLessThan(BARS.exact.medium);
+    expect(BARS.exact.medium).toBeLessThan(BARS.exact.low);
+    expect(isConfident(1, BARS.exact.high, false, "high")).toBe(true);
+    expect(isConfident(1, BARS.exact.high - 1, false, "high")).toBe(false);
+    expect(isConfident(1, BARS.exact.medium, false, "medium")).toBe(true);
+    expect(isConfident(1, BARS.exact.medium - 1, false, "medium")).toBe(false);
+    expect(isConfident(1, BARS.exact.low, false, "low")).toBe(true);
+    expect(isConfident(1, BARS.exact.low - 1, false, "low")).toBe(false);
+    expect(judge({ sim: 1, pop: 1, intent: false, band: "low" }).rule).toBe("needs pop>=1000, has 1");
+  });
+
+  test("the first result that matches closely needs half the popularity, never a non-matching one", () => {
+    expect(judge({ sim: 1, pop: 500, intent: false, band: "low", rank: 0 }).accepted).toBe(true);
+    expect(judge({ sim: 1, pop: 500, intent: false, band: "low", rank: 1 }).accepted).toBe(false);
+    expect(judge({ sim: 1, pop: 499, intent: false, band: "low", rank: 0 }).accepted).toBe(false);
+    expect(judge({ sim: 0.5, pop: 99999, intent: false, band: "low", rank: 0 }).accepted).toBe(false);
+    expect(judge({ sim: 0.85, pop: 99999, intent: false, band: "high", rank: 0 }).accepted).toBe(false);
+  });
+});
+
+describe("a popular series, typed without a keyword (the 'dungeon crawler carl' case)", () => {
+  const QUERIES = ["cellar delver ned", "cellar delver ned books", "cellar delver ned novel", "cellar delver ned series"];
+
+  test("A: the plain title shows, with and without a book word", () => {
+    for (const query of QUERIES) expect(pickIds(query, [delver()])).toBe("7100001");
+  });
+
+  test("B: a '(Series, #1)' title suffix does not hide it", () => {
+    const books = [delver({ title: "Cellar Delver Ned (Cellar Delver Ned, #1)" })];
+    for (const query of QUERIES) expect(pickIds(query, books)).toBe("7100001");
+  });
+
+  test("C: a subtitle variant shows", () => {
+    const books = [delver({ title: "Cellar Delver Ned: A LitRPG Adventure" })];
+    for (const query of QUERIES) expect(pickIds(query, books)).toBe("7100001");
+  });
+
+  test("D: a missing users_count does not hide a book that the other signals show to be popular", () => {
+    const books = [delver({ users_count: undefined })];
+    expect(books[0].saved).toBe(0);
+    for (const query of QUERIES) expect(pickIds(query, books)).toBe("7100001");
+    const onlyLists = [delver({ users_count: null, users_read_count: null, ratings_count: null, reviews_count: null, lists_count: 5000 })];
+    expect(pickIds("cellar delver ned", onlyLists)).toBe("7100001");
+  });
+
+  test("E: a small users_count gives the same answer with and without a book word", () => {
+    const books = [delver({ users_count: 12, users_read_count: 4, ratings_count: 3, lists_count: 1, reviews_count: 0 })];
+    // A distinctive three-word title only needs a minimal signal; the keyword makes no difference any more.
+    expect(pickIds("cellar delver ned", books)).toBe("7100001");
+    expect(pickIds("cellar delver ned books", books)).toBe("7100001");
+  });
+
+  test("F: an audiobook edition listed first does not stop the book", () => {
+    const audio = delver({ id: 7100009, pages: 0, audio_seconds: 90_000, has_audiobook: true });
+    expect(pickIds("cellar delver ned", [audio, delver()])).toBe("7100001");
+  });
+
+  test("G: a box set listed first does not stop the book", () => {
+    const box = delver({ id: 7100008, title: "Cellar Delver Ned Boxed Set: Books 1-3", compilation: true });
+    expect(pickIds("cellar delver ned", [box, delver()])).toBe("7100001");
+  });
+
+  test("H: only later books returned: the series name picks book 1 (or the lowest position that came back)", () => {
+    const two = delver({ id: 7100002, title: "The Flooded Stairwell", featured_series: { series: { name: "Cellar Delver Ned" }, position: 2 }, featured_series_position: 2 });
+    const three = delver({ id: 7100003, title: "Ned and the Lantern Crown", featured_series: { series: { name: "Cellar Delver Ned" }, position: 3 }, featured_series_position: 3 });
+    expect(pickIds("cellar delver ned", [three, two])).toBe("7100002");
+    const one = delver({ id: 7100001, title: "The Collapsed Larder", featured_series: { series: { name: "Cellar Delver Ned" }, position: 1 }, featured_series_position: 1 });
+    expect(pickIds("cellar delver ned", [three, one, two])).toBe("7100001");
+    expect(pickIds("cellar delver ned series", [three, one, two])).toBe("7100001");
+  });
+
+  test("series-name queries never pick a compilation or an audiobook-only entry while a real book exists", () => {
+    const box = delver({ id: 1, title: "The Collapsed Larder Box Set", compilation: true, featured_series_position: 1 });
+    const audio = delver({ id: 2, title: "The Collapsed Larder (Audiobook)", pages: 0, audio_seconds: 3600, featured_series_position: 1 });
+    const text = delver({ id: 3, title: "The Collapsed Larder", featured_series: { series: { name: "Cellar Delver Ned" }, position: 1 } });
+    expect(pickIds("cellar delver ned", [box, audio, text])).toBe("3");
+  });
+
+  test("the series name must equal the query: partial overlaps and generic words never match", () => {
+    const books = [delver({ title: "The Collapsed Larder" })];
+    for (const query of ["ned", "delver", "cellar", "carl", "cellar ned", "delver ned"]) expect(pickIds(query, books)).toBeNull();
+    expect(pickIds("cellar delver", books)).toBeNull();
+    // a one-word series name is low specificity: it needs a lot of popularity
+    const oneWord = delver({ title: "The Collapsed Larder", featured_series: { series: { name: "Ned" }, position: 1 }, series_names: ["Ned"], users_count: 30, users_read_count: 10, ratings_count: 10 });
+    expect(pickIds("ned", [oneWord])).toBeNull();
+  });
+
+  test("a series entry with no position at all is still found when it is the only candidate", () => {
+    const loose = delver({ title: "Odd Name Entirely", featured_series_position: undefined, featured_series: { series: { name: "Cellar Delver Ned" } } });
+    expect(loose.seriesPosition).toBe(0);
+    expect(pickIds("cellar delver ned", [loose])).toBe("7100001");
+  });
+
+  test("the series name is shown as a fact, once, and escaped", () => {
+    const html = buildPanel({ book: delver() });
+    expect(html).toContain("<dt>Series</dt><dd>Cellar Delver Ned</dd>");
+    expect(buildPanel({ book: delver({ featured_series: undefined, series_names: undefined }) })).not.toContain("<dt>Series</dt>");
+    expect(buildPanel({ book: { ...delver(), seriesName: '<img src=x onerror="1">' } })).not.toContain("<img src=x");
+  });
+});
+
+describe("generic words stay quiet", () => {
+  test("'weather', 'root', 'risk', 'carl' and 'dune'-like words need real popularity", () => {
+    expect(looksLikeATitleSearch("weather")).toBe(false);
+    expect(looksLikeATitleSearch("weather today")).toBe(false);
+    const modest = (title) => compactBook({ id: 5, title, author_names: ["X Y"], users_count: 150, ratings_count: 60, users_read_count: 80, release_year: 2001 });
+    for (const word of ["root", "risk", "carl", "dune", "ring"]) {
+      expect(pickIds(word, [modest(word[0].toUpperCase() + word.slice(1))])).toBeNull();
+    }
+    const huge = compactBook({ id: 6, title: "Dune", author_names: ["F H"], users_count: 90_000, ratings_count: 50_000, users_read_count: 60_000, release_year: 1965 });
+    expect(pickIds("dune", [huge])).toBe("6");
+  });
+
+  test("a one-word query never picks a book that merely contains the word, or a series that contains it", () => {
+    const books = [delver(), delver({ id: 2, title: "Carl's Long Walk Home" })];
+    expect(pickIds("carl", books)).toBeNull();
+    expect(pickIds("ned", books)).toBeNull();
+    expect(pickIds("delver", books)).toBeNull();
+  });
+
+  test("an alternative title only counts a little for a short query", () => {
+    const books = [delver({ title: "Something Else Entirely", alternative_titles: ["Carl"] })];
+    expect(scoreBook(parseQuery("carl"), books[0], "low").sim).toBeLessThanOrEqual(0.85);
+    expect(pickIds("carl", books)).toBeNull();
+  });
+});
+
+describe("popularity signals", () => {
+  test("a missing, null or non-numeric signal never zeroes the others", () => {
+    for (const bad of [undefined, null, "", "x", NaN, -5, {}, []]) {
+      expect(popularity({ saved: bad, readers: 100 })).toBe(100);
+      expect(popularity({ saved: 100, readers: bad, ratingsCount: bad, listsCount: bad, reviewsCount: bad })).toBe(100);
+    }
+    expect(popularity({})).toBe(0);
+    expect(popularity(undefined)).toBe(0);
+  });
+
+  test("documents with every popularity field as strings, nulls or missing", () => {
+    const strings = compactBook({ id: "5", title: "T", users_count: "1200", ratings_count: "300", lists_count: "20", reviews_count: "9", users_read_count: "800" });
+    expect([strings.saved, strings.ratingsCount, strings.listsCount, strings.reviewsCount, strings.readers]).toEqual([1200, 300, 20, 9, 800]);
+    expect(popularity(strings)).toBe(1200);
+    const nulls = compactBook({ id: "5", title: "T", users_count: null, ratings_count: null, lists_count: null });
+    expect(popularity(nulls)).toBe(0);
+  });
+});
+
+describe("explaining decisions (debugMatching)", () => {
+  test("formatExplanation lists candidates with signals, verdicts and the outcome, on separate lines", () => {
+    const books = [delver({ users_count: 12, users_read_count: 4, ratings_count: 3, lists_count: 1 }), compactBook({ id: 2, title: "Other Tale", users_count: 5 })];
+    const query = parseQuery("cellar delver ned");
+    const text = formatExplanation("cellar delver ned", query, evaluate(query, books, { explain: true }));
+    const lines = text.split("\n");
+    expect(lines[0]).toBe('[books] "cellar delver ned" term="cellar delver ned" intent=false specificity=high source=hardcover');
+    expect(lines[1]).toMatch(/^ {2}#1 "Cellar Delver Ned" sim=1\.00 signals\[.*saved=12.*\] pop=12 -> accepted by exact title, high specificity/);
+    expect(lines[2]).toMatch(/^ {2}#2 "Other Tale" sim=0\.\d\d .* -> rejected: /);
+    expect(lines.at(-1)).toMatch(/^ {2}=> panel: "Cellar Delver Ned" \(/);
+  });
+
+  test("a rejection says what is missing, and 'no panel' closes the block", () => {
+    const query = parseQuery("dune");
+    const text = formatExplanation("dune", query, evaluate(query, [book("Dune", 12)], { explain: true }));
+    expect(text).toContain("rejected: needs pop>=500 (first result), has 12");
+    expect(text.split("\n").at(-1)).toMatch(/^ {2}=> no panel/);
+    const none = formatExplanation("zzz", parseQuery("zzz"), evaluate(parseQuery("zzz"), [], { explain: true }));
+    expect(none).toContain("(no candidates)");
+  });
+
+  test("at most six candidates, one line each, even with hostile titles", () => {
+    const many = Array.from({ length: 8 }, (_, i) => book(`Title ${i}\n[injected] ${"x".repeat(300)}`, 5, { id: String(i + 1) }));
+    const query = parseQuery("title");
+    const lines = formatExplanation("ti\ntle", query, evaluate(query, many, { explain: true })).split("\n");
+    expect(lines.filter((line) => line.startsWith("  #"))).toHaveLength(6);
+    expect(lines.every((line) => !line.startsWith("[injected]"))).toBe(true);
+    expect(lines).toHaveLength(8);
+  });
+
+  test("the slot logs the block only when debugMatching is on, and never the token", async () => {
+    const off = make({ apiToken: TOKEN });
+    expect((await capture(() => off.execute("glass orchard", makeContext()))).length).toBe(0);
+    const on = make({ apiToken: TOKEN, debugMatching: "true" });
+    const lines = await capture(() => on.execute("glass orchard", makeContext()));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toStartWith('[books] "glass orchard" term="glass orchard"');
+    expect(lines[0]).toContain("=> panel:");
+    expect(lines[0]).not.toContain(TOKEN);
+    expect(lines[0]).not.toContain("http");
+  });
+
+  test("a title-like query the gating rejects gets one line naming the rule, only in debug mode", async () => {
+    const on = make({ apiToken: TOKEN, debugMatching: true });
+    const lines = await capture(async () => {
+      expect(on.trigger("skyrim walkthrough")).toBe(false);
+      expect(on.trigger("how to bake bread")).toBe(false);
+    });
+    expect(lines).toEqual(['[books] "skyrim walkthrough" skipped: the query has a video game or board game word and no book word']);
+    const off = make({ apiToken: TOKEN });
+    expect(await capture(async () => expect(off.trigger("skyrim walkthrough")).toBe(false))).toEqual([]);
+    const strict = make({ apiToken: TOKEN, debugMatching: true, requireBookWord: true });
+    expect(await capture(async () => expect(strict.trigger("glass orchard")).toBe(false))).toHaveLength(1);
+  });
+
+  test("the setting is advanced, off by default, and in its own fieldset", () => {
+    const field = SETTINGS_SCHEMA.find((entry) => entry.key === "debugMatching");
+    expect(field).toMatchObject({ type: "toggle", default: "false", advanced: true });
+    expect(field.required).toBeUndefined();
+    expect(field.fieldset).toBeTruthy();
   });
 });

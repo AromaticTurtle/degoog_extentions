@@ -36,12 +36,11 @@ The plugin checks, in this order, and stops at the first "no":
    `hardcover`, `audiobook`, `ebook`, `isbn`, `series`, `trilogy`, `sequel`, `prequel`, `summary`, `synopsis`, `chapters`,
    `reading order`, `read`) or says `by <author>`.
 5. Hardcover is searched (**1 request**; the reply carries the full details, so there is no second request). The panel shows
-   only for a **confident match**: the title matches (ignoring case, accents, punctuation, a leading "the" and a year in
-   brackets; alternative titles and the title without its subtitle count) and enough Hardcover readers saved the book not to
-   be an obscure entry with the same name. A book word, or `by <author>`, lowers the bar. A trailing number or numeral counts
-   as a different book, so `dune 2` does not show Dune. A word that fits the subtitles of several series (`legacy`) shows
-   nothing unless the query also says it is about a book. Compilations ("Complete Collection") are only shown when nothing
-   else fits. If several entries share the name, the closest title wins, then one with a release year, then the most saved.
+   only for a **confident match** (see "How the match is decided" below). A trailing number or numeral counts as a different
+   book, so `dune 2` does not show Dune. A word that fits the subtitles of several series (`legacy`) shows nothing unless the
+   query also says it is about a book. Compilations ("Complete Collection") and audiobook-only entries are only shown when
+   nothing else fits. If several entries share the name, the closest title wins, then one with a release year, then the most
+   popular.
 
 Authors are understood in two forms: `<title> by <author>` (split on the last "by") and `<title> <author>`. Hardcover's search
 matches author names too, and the plugin takes the author's name out of the query before comparing titles. A query that is
@@ -54,6 +53,24 @@ So a new title costs **1 request**, a query that is not a book title costs 0 or 
 for 24 hours per title (including "no match"). Searching the same book again costs nothing. Identical simultaneous searches
 share a request. A title-like query that is not a book (`starfall`) costs one Hardcover search the first time and is then
 remembered for a day.
+
+## How the match is decided
+A book with the right title is shown when it is **popular enough for how specific your query is**:
+- A **long, distinctive title** (three or more words, or 14+ letters: `dungeon crawler carl`, `project hail mary`) needs almost no
+  popularity, because nothing else is called that. A **two-word or longer-single-word title** (`gone girl`, `hyperion`) needs a
+  small amount. A **short single word** (`dune`, `carl`, `root`, `risk`) needs a lot, since many books share it. You do not need a
+  keyword like "book" any more for a distinctive exact title.
+- "Popular" is the **strongest of several Hardcover counts** (readers who saved it, who read it, ratings, lists it is on,
+  reviews), so one missing or small number does not hide a famous book.
+- When Hardcover lists the book as its **first result** and the title matches closely, half of the popularity is enough.
+- Series markers and edition marks are ignored on both sides: `Dungeon Crawler Carl (Dungeon Crawler Carl, #1)`, `Dune: A Novel`,
+  `Title, Book One`, `(Special Edition)`. `#2` or "Book Two" are **not** ignored, they name another book.
+- **A series name** (`dungeon crawler carl` for a series of that name) shows the **first book of the series** (the lowest position
+  Hardcover returned, never a box set or an audiobook-only entry), and the panel's facts list the series. Only the exact series
+  name counts, a part of it (`carl`) never does.
+- A book word (`books`, `novel`, `series`...) or `by <author>` lowers the bar further, but is no longer needed for a clear title.
+
+The numbers are the constants at the top of `match.js` (`BARS`, the intent thresholds) and were chosen without real Hardcover data.
 
 ## Being polite, and Hardcover's limits
 - Hardcover's **free plan** allows **5,000 requests a day**, bursts of 10 and **60 a minute**. Each top-level GraphQL field
@@ -95,9 +112,29 @@ remembered for a day.
   Some things were not verifiable without a token: the **cover** field is not in the documented list, so the plugin reads
   `image.url`, a plain `image` string and `cached_image` and hopes one is there; the exact shape of `results` (a Typesense
   response) and of `featured_series`, and the type of `id`, are handled defensively rather than known.
-- Author-only queries show nothing, and the matching constants (the readers thresholds and similarity values at the top of
-  `match.js`) were chosen without real data and will need tuning.
+- Author-only queries show nothing, and the matching constants (the popularity bars and similarity values at the top of
+  `match.js`) were chosen without real data and will need tuning (see "Troubleshooting" below, which shows the numbers).
 - The `RateLimit` header format is taken from the docs and not verified against a live reply.
+
+## Troubleshooting: why did (or didn't) a panel show
+Turn on **Explain matching in the log** (Settings > Plugins > Books > Configure, under Troubleshooting; it is off by default and
+costs nothing when off). Every lookup then writes one block to the server log, for example:
+
+```
+[books] "dungeon crawler carl" term="dungeon crawler carl" intent=false specificity=high source=hardcover
+  #1 "Dungeon Crawler Carl" sim=1.00 signals[saved=..,read=..,ratings=..] pop=.. -> accepted by exact title, high specificity (first result)
+  #2 "Carl's Doomsday Scenario" sim=0.50 signals[...] pop=.. -> rejected: similarity 0.50 is too low
+  => panel: "Dungeon Crawler Carl" (exact title: ...)
+```
+
+It shows the candidates Hardcover returned (up to six, in Hardcover's order), how well each title fits, the popularity numbers
+used, and the rule that accepted a book or what it was missing (`rejected: needs pop>=1000, has 12`). A query that looked like
+a title but never reached Hardcover gets one line saying why (`skipped: the query has a video game or board game word...`).
+Only the query and catalog titles are logged, never the token or an address.
+
+To try a query from your own terminal with your real token (one request, nothing saved, output refused if it contains the token):
+`HARDCOVER_API_TOKEN=your-token bun ./tests/diagnose-books.js "dungeon crawler carl"`. Paste the output when asking for the
+constants to be tuned.
 
 ## Development notes
 - **The fixture is hand-written**: `tests/fixtures/hardcover-search.json` uses invented books ("The Glass Orchard", the Orchard
@@ -111,5 +148,6 @@ remembered for a day.
   real degoog container: `DEGOOG_HARDCOVER_API_URL=http://host:4470/v1/graphql`. A search term containing `quota` makes it
   answer 429, `scope` a 403 `insufficient_scope`, `gqlerror` an HTTP 200 with an `errors` list, `slow` waits 3 seconds, and
   `zzz` finds nothing. `GET /__stats` counts requests.
+- `tests/diagnose-books.js` runs one real lookup with your token and prints the explain block (see "Troubleshooting").
 - The matching rules and their tuning constants are at the top of `match.js`; the panel's settings are stored under the id
   `books-slot`.

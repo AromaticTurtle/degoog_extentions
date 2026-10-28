@@ -30,12 +30,13 @@ The plugin checks, in this order, and stops at the first "no":
 3. If **Only for queries that sound like games** is on, it also contains a game word (`game`, `steam`, `ps5`, `xbox`,
    `walkthrough`, `review`, `dlc`, `mods`, `rpg`...).
 4. IGDB is asked for the 8 best matches (**1 request**). Entries that are not the game itself (DLC, expansions, bundles,
-   mods, episodes...) are ignored. The panel shows only if one is a confident match: the title matches (ignoring case,
-   accents, punctuation, a leading "the" and a year such as "(2016)") and the game has enough ratings not to be a fan
-   project with the same name. A single word may match a subtitle, so `skyrim` finds *The Elder Scrolls V: Skyrim*, but a
-   word that fits several series (`origins`) shows nothing unless the query also says it is about a game (`origins game`).
-   A trailing number or numeral counts as a different game, so `hades 2` does not show the first Hades.
-   If several entries share the name, the closest title wins, then the one with the most ratings.
+   mods, episodes...) are ignored. The panel shows only if one is a confident match (see "How the match is decided" below):
+   the title matches (ignoring case, accents, punctuation, a leading "the", a year such as "(2016)" and edition marks such as
+   "Special Edition") and the game has enough ratings not to be a fan project with the same name. A single word may match a
+   subtitle, so `skyrim` finds *The Elder Scrolls V: Skyrim*, but a word that fits several series (`origins`) shows nothing
+   unless the query also says it is about a game (`origins game`). A trailing number or numeral counts as a different game, so
+   `hades 2` does not show the first Hades. If several entries share the name, the closest title wins, then the one with the
+   most ratings.
 5. For a match, in parallel: the **time to beat** (**1 request**), and, only when IGDB lists no Steam page for a PC game
    and the Steam lookup is on, a **Steam store search** (0 or 1 request, an exact name match only).
 6. If there is a Steam app id and ProtonDB is on, **1 request** to ProtonDB.
@@ -79,6 +80,27 @@ for 7 days (including "none"). Identical simultaneous searches share a request. 
   never from text in an API reply.
 - Covers are fetched through degoog's own image proxy.
 
+## How the match is decided
+A game with the right title is shown when it has **enough ratings for how specific your query is**: a long, distinctive title
+(three or more words, or 14+ letters) needs very few ratings, a two-word or long single-word title (`elden ring`, `wingspan`)
+a few, and a short single word (`hades`, `root`, `risk`) many, because many games share it. "Ratings" is the strongest of
+IGDB's counts (total, players, critics, players plus critics), so one missing number never hides a game. When IGDB lists the
+game as its **first result** and the title matches closely, half is enough. Edition marks (`Special Edition`, `Deluxe Edition`,
+`Remastered`...) are ignored on both sides, and alternative names count (names in other scripts are not compared). A game word
+(`game`, `steam`, `ps5`, `walkthrough`...) lowers the bar. The numbers are the constants at the top of `match.js` (`BARS`) and
+were chosen without real data.
+
+## Troubleshooting: why did (or didn't) a panel show
+Turn on **Explain matching in the log** (Settings > Plugins > Game info > Configure, under Troubleshooting; off by default, no
+cost when off). Every lookup then writes one block to the server log: the candidates IGDB returned (up to six, in IGDB's order),
+how well each name fits, the rating counts, and the rule that accepted a game or what it was missing, for example
+`rejected: needs pop>=20, has 6`, `rejected: game type "DLC" is not a game of its own`. A title-like query that never reached
+IGDB gets one line saying why. Only the query and game names are logged, never the credentials or an address.
+
+To try a query from your own terminal with your real credentials (a token request, one search, and the follow-up requests of a
+confident match; nothing saved; output refused if it contains a credential):
+`IGDB_CLIENT_ID=your-id IGDB_CLIENT_SECRET=your-secret bun ./tests/diagnose-game-info.js "wingspan"`.
+
 ## Development notes
 - **The IGDB fixtures are hand-written**, to IGDB's documented layout. `tests/fixtures/igdb-games.json` and
   `igdb-time-to-beat.json` are **not real recordings** (the games, ratings and image ids are made up for the tests).
@@ -92,6 +114,7 @@ for 7 days (including "none"). Identical simultaneous searches share a request. 
   checking the plugin inside a real degoog container. Give the same base URL to the four overrides:
   `DEGOOG_IGDB_API_BASE` (`.../v4`), `DEGOOG_IGDB_TOKEN_URL` (`.../oauth2/token`), `DEGOOG_PROTONDB_BASE` and
   `DEGOOG_STEAM_BASE`. It accepts client ID `test-id`, secret `test-secret` and token `test-token`.
+- `tests/diagnose-game-info.js` runs one real lookup with your credentials and prints the explain block (see "Troubleshooting").
 - The matching rules and their tuning constants (similarity values, popularity thresholds, accepted IGDB game types) are at
   the top of `match.js`.
 - The panel's settings are stored under the id `game-info-slot`.

@@ -89,6 +89,18 @@ const seriesOf = (doc) => {
   return position > 0 && position < 10_000 ? `${name} #${Number.isInteger(position) ? position : round(position, 2)}` : name;
 };
 
+// The series' own name and the book's number in it (0 when unknown); the matcher uses them for series-name queries.
+const seriesNameOf = (doc) => {
+  const featured = object(doc.featured_series);
+  return text(object(featured.series).name, 80) || text(featured.name, 80) || names(doc.series_names, 1)[0] || "";
+};
+
+const seriesPositionOf = (doc) => {
+  const featured = object(doc.featured_series);
+  const position = number(doc.featured_series_position ?? featured.position);
+  return position > 0 && position < 10_000 ? position : 0;
+};
+
 const isbnOf = (doc) => {
   const clean = (Array.isArray(doc.isbns) ? doc.isbns : [])
     .map((value) => text(value, 30).replace(/[\s-]/g, ""))
@@ -127,10 +139,15 @@ export const compactBook = (document) => {
     genres: names(doc.genres, 5, 40),
     moods: names(doc.moods, 4, 40),
     series: seriesOf(doc),
+    seriesName: seriesNameOf(doc),
+    seriesNames: names(doc.series_names, 4, 80),
+    seriesPosition: seriesPositionOf(doc),
     rating: rating >= 0 && rating <= 5 ? rating : 0,
     ratingsCount: integer(doc.ratings_count),
     readers: integer(doc.users_read_count),
     saved: integer(doc.users_count),
+    listsCount: integer(doc.lists_count),
+    reviewsCount: integer(doc.reviews_count),
     compilation: bool(doc.compilation),
     hasAudiobook: bool(doc.has_audiobook),
     hasEbook: bool(doc.has_ebook),

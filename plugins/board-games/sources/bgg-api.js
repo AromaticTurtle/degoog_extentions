@@ -1,6 +1,6 @@
 import { Budget, usageFile } from "../budget.js";
 import { DEFAULT_API_BASE, buildHeaders, buildSearchUrl, buildThingUrl, normalizeToken } from "../request.js";
-import { cacheKey, pickGame, rankCandidates } from "../match.js";
+import { cacheKey, rankCandidates } from "../match.js";
 import { SEARCH_MAX_CHARS, SOURCE_API, THING_MAX_CHARS, parseThings, scanSearch } from "../shape.js";
 import { Upstream } from "../upstream.js";
 
@@ -89,13 +89,13 @@ export class BggApiSource {
 
   // -> { status: "ok", game|null } or { status: "unavailable", reason, hints? }.
   // After a failed details request the candidate ids are handed on as hints.
-  async lookup({ term, intent, context, deadline }) {
+  async lookup({ term, intent, context, deadline, query }) {
     const request = { context, deadline };
     const search = await this._candidates(term, request);
     if (!search.ok) return { status: "unavailable", reason: search.reason };
     if (!search.ids.length) return { status: "ok", game: null };
     const details = await this._things(search.ids, request);
     if (!details.ok) return { status: "unavailable", reason: details.reason, hints: { ids: search.ids } };
-    return { status: "ok", game: pickGame(term, details.games, intent) };
+    return { status: "ok", game: this.host.decide({ query, term, intent, games: details.games, source: this.id }) };
   }
 }

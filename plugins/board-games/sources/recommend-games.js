@@ -1,6 +1,6 @@
 import { Budget, recommendGamesUsageFile } from "../budget.js";
 import { USER_AGENT, sanitizeTerm } from "../request.js";
-import { cacheKey, pickGame } from "../match.js";
+import { cacheKey } from "../match.js";
 import { RECOMMEND_MAX_CHARS, SOURCE_RECOMMEND_GAMES, parseRecommendGames } from "../shape.js";
 import { Upstream } from "../upstream.js";
 
@@ -54,9 +54,10 @@ export class RecommendGamesSource {
     });
   }
 
-  async lookup({ term, intent, context, deadline }) {
+  // recommend.games lists its matches in search order, so a close first result needs fewer votes (rankBonus).
+  async lookup({ term, intent, context, deadline, query }) {
     const found = await this._games(term, { context, deadline });
     if (!found.ok) return { status: "unavailable", reason: found.reason };
-    return { status: "ok", game: pickGame(term, found.games, intent) };
+    return { status: "ok", game: this.host.decide({ query, term, intent, games: found.games, source: this.id, rankBonus: true }) };
   }
 }

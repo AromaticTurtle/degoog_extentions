@@ -84,11 +84,12 @@ The plugin checks, in this order, and stops at the first "no":
    `bgg`, `meeple`, `rulebook`, `rules`, `setup`, `expansion`, `solo variant`, `worker placement`, `deck builder`,
    `card game`, `dice game`, `how to play`, `player count`...).
 5. The first usable source is asked. Whichever source it is, a game is shown only for a **confident match**: the title
-   matches (ignoring case, accents, punctuation, a leading "the" and a year in brackets; alternate names count) and the game
-   has enough BGG ratings not to be an obscure game with the same name. A board game word in the query lowers the bar. A
-   trailing number or numeral counts as a different game, so `azul 2` does not show Azul. A word that fits the subtitles of
-   several series (`legacy`) shows nothing unless the query also says it is about a board game. Expansions are never shown.
-   If several entries share the name, the closest title wins, then the one with the most ratings.
+   matches (ignoring case, accents, punctuation, a leading "the", a year in brackets and edition marks such as "(Second
+   Edition)"; alternate names in Latin letters count) and the game has enough BGG ratings not to be an obscure game with the
+   same name (see "How the match is decided"). A board game word in the query lowers the bar. A trailing number or numeral
+   counts as a different game, so `azul 2` does not show Azul. A word that fits the subtitles of several series (`legacy`)
+   shows nothing unless the query also says it is about a board game. Expansions are never shown. If several entries share the
+   name, the closest title wins, then the one with the most ratings.
 
 Board game words at the **end** of the query are dropped before searching (`wingspan board game` searches `wingspan`,
 `catan rules` searches `catan`).
@@ -136,12 +137,41 @@ third-party reports; check the current terms yourself.
   credit link in `render.js` (`attributionHtml`) and size `.board-games-credit img` in `style.css`. If your instance is
   public, do this.
 
+## How the match is decided
+A game with the right title is shown when it has **enough BGG ratings for how specific your query is**: a long, distinctive title
+(three or more words, or 14+ letters) needs few ratings, a two-word or long single-word title (`wingspan`, `catan`) a moderate
+number, and a short single word (`risk`, `root`) many, since many games share it. When recommend.games lists the game as its
+**first result** and the title matches closely, half is enough (BGG's own search order is not assumed, so the XML API does not
+get this bonus). Edition marks and brackets are ignored on both sides, and a game's alternate names count, but only the ones in
+Latin letters: a name in another script would lose its letters and could look identical to a different game. The numbers are
+the constants at the top of `match.js` (`BARS`, the intent thresholds) and were chosen without real data.
+
+## Troubleshooting: why did (or didn't) a panel show
+- **The first search for a game shows nothing, the second one works.** recommend.games can take **15 to 25 seconds** to answer
+  a search (measured for `wingspan`), and degoog gives a slot 10 seconds. The plugin gives up on that search just before
+  degoog's limit, but the request keeps running and its answer is **cached**, so searching again a moment later shows the
+  panel at once (and costs no request). A second search while the first is still running shares it. Sources that are fast
+  (the BGG XML API with a token, typically a couple of seconds) do not have this problem; that is the main reason to set up a
+  token.
+- Turn on **Explain matching in the log** (Settings > Plugins > Board games > Configure, under Troubleshooting; off by default,
+  no cost when off). Every lookup then writes one block to the server log: which source answered, the candidates (up to six),
+  how well each title fits, the rating counts and the rule that accepted a game or what it was missing, for example
+  `rejected: needs pop>=1000, has 85`. A title-like query that never reached a source gets one line saying why (a video game
+  word, no usable source...), and a lookup that is still running when the time is up says so. Only the query and game names are
+  logged, never the token or an address.
+- From your own terminal, one lookup chain with the real services (a single recommend.games request, slow as above, unless you
+  set `BGG_API_TOKEN`; add `--internal` to allow BGG's website API too; nothing is saved; the output is refused if it contains
+  the token): `bun ./tests/diagnose-board-games.js "wingspan"`.
+
 ## Limitations (honest)
 - **The test data is invented.** BGG's XML API only answers registered applications, so its layout is written from
   documentation and third-party reports and is **unverified** until real fixtures are recorded. The recommend.games, BGG
   website API and Wikidata layouts were checked against the live services (field names and types only) while building this.
-- recommend.games returns every fuzzy match for a search and its ordering is not assumed: the plugin reads the first 30
-  results, drops expansions, and matches locally, so a game far down a very long list of matches can be missed.
+- recommend.games returns every fuzzy match for a search and its ordering is not verified: the plugin reads the first 30
+  results, drops expansions, and matches locally, so a game far down a very long list of matches can be missed. Only the "first
+  result needs half the ratings" bonus relies on the order, and only for a close title match.
+- recommend.games is slow (15 to 25 seconds for a search), see "Troubleshooting" above: the first search of a new title
+  usually shows nothing when it is the only source in use.
 - The matching constants were chosen without real data and will need tuning.
 - If BGG or recommend.games change their formats, the affected source becomes "unavailable" and the chain moves on.
 
@@ -162,6 +192,7 @@ third-party reports; check the current terms yourself.
 - Layout: `index.js` (settings, gating, the chain), `sources/` (one module per source behind `usable()` and
   `lookup({term, intent, context, deadline, hints})`), `upstream.js` (pause, spacing, budget and status handling shared by
   all of them), `shape.js` (every source's normalised game), `match.js`, `render.js`, `xml.js`.
+- `tests/diagnose-board-games.js` runs one real lookup chain and prints the explain block (see "Troubleshooting").
 - The matching rules and their tuning constants (similarity values, rating-count thresholds, candidate limits, accepted item
   types, the board game and video game word lists) are at the top of `match.js`.
 - The panel's settings are stored under the id `board-games-slot`.

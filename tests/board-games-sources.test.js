@@ -23,6 +23,8 @@ import {
   rangeText,
 } from "../plugins/board-games/shape.js";
 import { attributionHtml, buildPanel } from "../plugins/board-games/render.js";
+import { SETTINGS_SCHEMA } from "../plugins/board-games/settings.js";
+import { BARS, evaluate, formatExplanation, judge, pickGame, scoreGame, specificity, stripDecorations, titleSimilarity } from "../plugins/board-games/match.js";
 import { BoardGamesSlot } from "../plugins/board-games/index.js";
 import { DEFAULT_RECOMMEND_BASE, recommendSearchUrl } from "../plugins/board-games/sources/recommend-games.js";
 import { DEFAULT_GEEKDO_BASE, dynamicInfoUrl, geekitemsUrl } from "../plugins/board-games/sources/bgg-internal.js";
@@ -923,19 +925,23 @@ describe("the fallback chain", () => {
     expect(count(context, "rg")).toBe(1);
   });
 
-  test("popularity for recommend.games is its vote count", async () => {
-    const few = JSON.stringify({ results: [{ ...recommendFixture.results[0], num_votes: 150 }] });
+  test("popularity for recommend.games is its vote count; a close first result needs half of the bar", async () => {
+    const withVotes = (votes) => JSON.stringify({ results: [{ ...recommendFixture.results[0], num_votes: votes }] });
+    const few = withVotes(49);
     const slot = make({ enableApi: "false" });
     expect(await slot.execute("starfall", makeContext({ recommend: few }))).toEqual(EMPTY);
-    const enough = JSON.stringify({ results: [{ ...recommendFixture.results[0], num_votes: 200 }] });
-    const other = make({ enableApi: "false" });
-    expect((await other.execute("starfall", makeContext({ recommend: enough }))).title).toBe("Starfall");
-    const ambiguous = make({ enableApi: "false" });
-    expect((await ambiguous.execute("starfall board game", makeContext({ recommend: few }))).title).toBe("Starfall");
+    // "starfall" is medium specificity (exact bar 100); it is the first result, so 50 votes are enough
+    expect((await make({ enableApi: "false" }).execute("starfall", makeContext({ recommend: withVotes(50) }))).title).toBe("Starfall");
+    // not the first result: the full bar applies
+    const second = JSON.stringify({ results: [{ ...recommendFixture.results[0], bgg_id: 1, name: "Unrelated Game", alt_name: [], num_votes: 5 }, { ...recommendFixture.results[0], num_votes: 99 }] });
+    expect(await make({ enableApi: "false" }).execute("starfall", makeContext({ recommend: second }))).toEqual(EMPTY);
+    // with a board game word the intent bar (50) applies
+    expect((await make({ enableApi: "false" }).execute("starfall board game", makeContext({ recommend: few }))).title).toBe("");
+    expect((await make({ enableApi: "false" }).execute("starfall board game", makeContext({ recommend: second }))).title).toBe("Starfall");
   });
 
   test("the website API applies the same confidence rules, with the vote count from its statistics", async () => {
-    const weak = { item: { ...dynamicinfo.item, stats: { ...dynamicinfo.item.stats, usersrated: "150" } } };
+    const weak = { item: { ...dynamicinfo.item, stats: { ...dynamicinfo.item.stats, usersrated: "99" } } };
     const calls = (dynamic) =>
       make({ enableApi: "false", enableRecommendGames: "false", enableBggInternal: "true" }).execute(
         "starfall",
@@ -1302,5 +1308,256 @@ describe("rendering for every source", () => {
     expect(html).not.toContain("<script");
     expect(html).toContain("data-source=\"&quot;&gt;&lt;script&gt;");
     expect(html).toContain("Powered by BGG");
+  });
+});
+
+// ---- Decision quality: regression tests. Invented games shaped like a real, hugely popular title that is ----
+// ---- also a video game, answered by recommend.games with several expansions and a translated standalone. ----
+
+// A recommend.games result in the real layout, with invented content.
+const rgResult = (id, name, votes, extra = {}) => ({
+  bgg_id: id,
+  name,
+  alt_name: [],
+  year: 2019,
+  description: "An invented description for tests.",
+  min_players: 1,
+  max_players: 5,
+  min_players_rec: 1,
+  max_players_rec: 5,
+  min_players_best: 2,
+  max_players_best: 4,
+  min_age: 10,
+  min_time: 40,
+  max_time: 70,
+  bgg_rank: 38,
+  num_votes: votes,
+  avg_rating: 8.1,
+  bayes_rating: 7.9,
+  complexity: 2.4,
+  designer_name: ["Invented Designer"],
+  category_name: ["Animals"],
+  mechanic_name: ["Hand Management"],
+  image_url: ["https://cf.geekdo-images.com/original/img/x.jpg", "https://cf.geekdo-images.com/small/img/x.jpg"],
+  url: `https://boardgamegeek.com/boardgame/${id}`,
+  ...extra,
+});
+const SKYREACH_REPLY = JSON.stringify({
+  count: 6,
+  next: null,
+  previous: null,
+  results: [
+    rgResult(910002, "Skyreach: Northern Expansion", 9000, { category_name: ["Expansion for Base-game", "Animals"] }),
+    rgResult(910001, "Skyreach", 115_000),
+    rgResult(910003, "Skyreach: Southern Expansion", 7000, { category_name: ["Expansion for Base-game"] }),
+    rgResult(910004, "Skyreach Asia", 4000, { alt_name: ["Skyreach Ασία", "Skyreach Asien"], category_name: ["Expansion for Base-game"] }),
+    rgResult(910005, "Skyreach Oceania", 6000, { alt_name: ["Skyreach Ωκεανία"], category_name: ["Expansion for Base-game"] }),
+    rgResult(910006, "Skyreach Duel", 3200, { alt_name: ["Skyreach Ωκεανία"] }),
+  ],
+});
+
+describe("an exact, popular title shows without a keyword (the 'wingspan' case)", () => {
+  test("recommend.games: expansions are dropped and the base game is picked, with or without a board game word", async () => {
+    for (const query of ["skyreach", "skyreach board game", "the skyreach"]) {
+      const slot = make({ enableApi: "false" });
+      const out = await slot.execute(query, makeContext({ recommend: SKYREACH_REPLY }));
+      expect(out.title).toBe("Skyreach");
+      expect(sourceOf(out)).toBe("recommend-games");
+    }
+    const games = parseRecommendGames(SKYREACH_REPLY);
+    expect(games.map((game) => game.id)).toEqual(["910001", "910006"]);
+  });
+
+  test("a translated alternate name in another script never makes a different game look exact", () => {
+    const duel = parseRecommendGames(SKYREACH_REPLY).find((game) => game.id === "910006");
+    expect(duel.alternates).toContain("Skyreach Ωκεανία");
+    // the Greek letters would vanish when normalised and leave "skyreach": only Latin names are compared
+    expect(scoreGame("skyreach", duel).sim).toBeLessThan(1);
+    const withAsia = [rgResult(910004, "Skyreach Asia", 4000, { alt_name: ["Skyreach Ασία"] }), rgResult(910001, "Skyreach", 115_000)].map((raw) => parseRecommendGames(JSON.stringify({ results: [raw] }))[0]);
+    expect(pickGame("skyreach", withAsia, false).id).toBe("910001");
+    expect(scoreGame("skyreach", withAsia[0]).sim).toBe(0.9); // "Skyreach Asia" only starts with the query
+  });
+
+  test("the same title in several editions: the closest, most rated one wins", () => {
+    const games = [
+      { id: "1", name: "Skyreach (Second Edition)", alternates: [], ratingCount: 900 },
+      { id: "2", name: "Skyreach", alternates: [], ratingCount: 50_000 },
+      { id: "3", name: "Skyreach: Digital Edition", alternates: [], ratingCount: 3000 },
+    ];
+    expect(pickGame("skyreach", games, false).id).toBe("2");
+    expect(pickGame("skyreach second edition", games, false).id).toBe("1");
+    expect(titleSimilarity("skyreach", "Skyreach (Second Edition)")).toBe(1);
+    expect(titleSimilarity("skyreach digital edition", "Skyreach")).toBe(1);
+  });
+});
+
+describe("specificity, edition marks and the rank bonus", () => {
+  test("bands", () => {
+    expect(specificity("risk")).toBe("low");
+    expect(specificity("root")).toBe("low");
+    expect(specificity("carl")).toBe("low");
+    expect(specificity("wingspan")).toBe("medium");
+    expect(specificity("the crew")).toBe("medium");
+    expect(specificity("ticket to ride")).toBe("high");
+    expect(specificity("gloomhaven jaws of the lion")).toBe("high");
+    expect(specificity("Catan (Second Edition)")).toBe("low");
+  });
+
+  test("edition marks and parentheticals are cut off on both sides, the numeral rule stays", () => {
+    expect(stripDecorations("Catan (Second Edition)")).toBe("Catan");
+    expect(stripDecorations("Pandemic: Revised Edition")).toBe("Pandemic");
+    expect(stripDecorations("Azul (2017)")).toBe("Azul (2017)".replace(/\s*\(2017\)$/, ""));
+    expect(stripDecorations("")).toBe("");
+    expect(titleSimilarity("azul 2", "Azul")).toBeLessThan(0.9);
+    expect(titleSimilarity("azul 2", "Azul (Second Edition)")).toBeLessThan(0.9);
+    expect(pickGame("azul 2", [{ id: "1", name: "Azul", alternates: [], ratingCount: 90_000 }], false)).toBeNull();
+  });
+
+  test("bars fall as specificity rises", () => {
+    expect(BARS.exact.high).toBeLessThan(BARS.exact.medium);
+    expect(BARS.exact.medium).toBeLessThan(BARS.exact.low);
+    for (const band of ["low", "medium", "high"]) {
+      expect(judge({ sim: 1, pop: BARS.exact[band], intent: false, band }).accepted).toBe(true);
+      expect(judge({ sim: 1, pop: BARS.exact[band] - 1, intent: false, band }).accepted).toBe(false);
+    }
+  });
+
+  test("a close first result of a relevance-ordered source needs half the ratings; a non-match never passes", () => {
+    expect(judge({ sim: 1, pop: 200, intent: false, band: "low", rank: 0 }).accepted).toBe(true);
+    expect(judge({ sim: 1, pop: 200, intent: false, band: "low", rank: 1 }).accepted).toBe(false);
+    expect(judge({ sim: 1, pop: 200, intent: false, band: "low" }).accepted).toBe(false);
+    expect(judge({ sim: 0.5, pop: 999_999, intent: false, band: "high", rank: 0 }).accepted).toBe(false);
+    const list = [{ id: "1", name: "Risk", alternates: [], ratingCount: 200 }];
+    expect(evaluate("risk", list, false, { rankBonus: true }).pick?.id).toBe("1");
+    expect(evaluate("risk", list, false).pick).toBeNull();
+  });
+
+  test("generic words stay quiet", () => {
+    expect(looksBlocked("")).toBe(false);
+    for (const word of ["risk", "root", "carl", "weather"]) {
+      const list = [{ id: "1", name: word[0].toUpperCase() + word.slice(1), alternates: [], ratingCount: 150 }];
+      expect(pickGame(word, list, false)).toBeNull();
+    }
+  });
+});
+
+describe("a slow first lookup (recommend.games can take 15 s or more)", () => {
+  test("the late reply is cached, so the next search is instant and costs no request", async () => {
+    const slot = make({ enableApi: "false" });
+    slot.answerWindowMs = 30;
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const context = makeContext({ recommend: SKYREACH_REPLY });
+    const realFetch = context.fetch;
+    let started = 0;
+    context.fetch = async (url, init) => {
+      if (kindOf(url) === "rg") {
+        started += 1;
+        await gate;
+      }
+      return realFetch(url, init);
+    };
+    const first = await slot.execute("skyreach", context);
+    expect(first).toEqual(EMPTY); // degoog would have given up on this search too
+    expect(started).toBe(1);
+    // a second search while the request is still running shares it instead of starting another
+    const joined = slot.execute("skyreach", context);
+    release();
+    expect((await joined).title).toBe("Skyreach");
+    expect(started).toBe(1);
+    // and later searches come from the cache
+    expect((await slot.execute("skyreach", context)).title).toBe("Skyreach");
+    expect(count(context, "rg")).toBe(1);
+  });
+
+  test("the reply that arrives after the window is still cached", async () => {
+    const slot = make({ enableApi: "false" });
+    slot.answerWindowMs = 20;
+    const context = makeContext({ recommend: SKYREACH_REPLY });
+    const realFetch = context.fetch;
+    context.fetch = async (url, init) => {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      return realFetch(url, init);
+    };
+    expect(await slot.execute("skyreach", context)).toEqual(EMPTY);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect((await slot.execute("skyreach", context)).title).toBe("Skyreach");
+    expect(count(context, "rg")).toBe(1);
+  });
+
+  test("the window is a little shorter than degoog's slot timeout and follows it", async () => {
+    await withEnv({ DEGOOG_SLOT_TIMEOUT_MS: undefined }, () => expect(new BoardGamesSlot().answerWindowMs).toBe(9500));
+    await withEnv({ DEGOOG_SLOT_TIMEOUT_MS: "20000" }, () => expect(new BoardGamesSlot().answerWindowMs).toBe(19000));
+  });
+
+  test("a timed-out search says so in the log only when debugMatching is on", async () => {
+    const slow = (settings) => {
+      const slot = make({ enableApi: "false", ...settings });
+      slot.answerWindowMs = 10;
+      const context = makeContext({ recommend: SKYREACH_REPLY });
+      const realFetch = context.fetch;
+      context.fetch = async (url, init) => {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        return realFetch(url, init);
+      };
+      return { slot, context };
+    };
+    const quiet = slow({});
+    expect(await capture(() => quiet.slot.execute("skyreach", quiet.context))).toEqual([]);
+    const loud = slow({ debugMatching: "true" });
+    const lines = await capture(async () => {
+      await loud.slot.execute("skyreach", loud.context);
+      // the late reply is still processed (and explained) after the window
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(lines[0]).toContain('"skyreach" is still being looked up');
+    expect(lines.some((line) => line.includes("=> panel:"))).toBe(true);
+  });
+});
+
+describe("explaining decisions (debugMatching)", () => {
+  test("formatExplanation: header with the source, candidates, verdicts and the outcome", () => {
+    const games = parseRecommendGames(SKYREACH_REPLY);
+    const text = formatExplanation("skyreach", "skyreach", false, evaluate("skyreach", games, false, { explain: true, rankBonus: true }), "recommend-games");
+    const lines = text.split("\n");
+    expect(lines[0]).toBe('[board-games] "skyreach" term="skyreach" intent=false specificity=medium source=recommend-games');
+    expect(lines[1]).toMatch(/^ {2}#1 "Skyreach" sim=1\.00 signals\[ratings=115000\] pop=115000 -> accepted by exact title, medium specificity \(first result\)/);
+    expect(lines.at(-1)).toMatch(/^ {2}=> panel: "Skyreach" \(exact title/);
+    const rejected = formatExplanation("risk", "risk", false, evaluate("risk", [{ id: "1", name: "Risk", alternates: [], ratingCount: 40 }], false, { explain: true }), "bgg-api");
+    expect(rejected).toContain("rejected: needs pop>=400, has 40");
+    expect(rejected.split("\n").at(-1)).toMatch(/^ {2}=> no panel/);
+    expect(formatExplanation("x", "x", false, evaluate("x", [], false, { explain: true }), "bgg-api")).toContain("(no candidates)");
+  });
+
+  test("the slot logs one block per lookup, only when debugMatching is on, and never the token", async () => {
+    const quiet = make({ enableApi: "false" });
+    expect(await capture(() => quiet.execute("skyreach", makeContext({ recommend: SKYREACH_REPLY })))).toEqual([]);
+    const loud = make({ debugMatching: "true" });
+    const lines = await capture(() => loud.execute("starfall", makeContext()));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toStartWith('[board-games] "starfall" term="starfall"');
+    expect(lines[0]).toContain("source=bgg-api");
+    expect(lines[0]).toContain("=> panel:");
+    for (const bad of [TOKEN, "http", "Bearer"]) expect(lines[0]).not.toContain(bad);
+  });
+
+  test("a title-like query that the gating rejects gets one line naming the rule, only in debug mode", async () => {
+    const loud = make({ debugMatching: true });
+    const lines = await capture(async () => {
+      expect(loud.trigger("starfall ps5")).toBe(false);
+      expect(loud.trigger("how to bake bread")).toBe(false);
+    });
+    expect(lines).toEqual(['[board-games] "starfall ps5" skipped: the query has a video game word and no board game word']);
+    expect(await capture(async () => expect(make().trigger("starfall ps5")).toBe(false))).toEqual([]);
+    const none = make({ debugMatching: true, enableApi: "false", enableRecommendGames: "false" });
+    expect(await capture(async () => expect(none.trigger("starfall")).toBe(false))).toHaveLength(1);
+  });
+
+  test("the setting is advanced, off by default and never required", () => {
+    const field = SETTINGS_SCHEMA.find((entry) => entry.key === "debugMatching");
+    expect(field).toMatchObject({ type: "toggle", default: "false", advanced: true });
+    expect(field.required).toBeUndefined();
   });
 });

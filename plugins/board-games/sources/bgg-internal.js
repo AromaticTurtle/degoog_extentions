@@ -1,6 +1,6 @@
 import { Budget, geekdoUsageFile } from "../budget.js";
 import { USER_AGENT, isId } from "../request.js";
-import { cacheKey, pickGame } from "../match.js";
+import { cacheKey } from "../match.js";
 import { SOURCE_INTERNAL, compactGeekdo, geekdoId, isGeekdoBoardGame } from "../shape.js";
 import { Upstream } from "../upstream.js";
 import { Wikidata } from "./wikidata.js";
@@ -101,7 +101,7 @@ export class BggInternalSource {
     });
   }
 
-  async lookup({ term, intent, context, deadline, hints }) {
+  async lookup({ term, intent, context, deadline, hints, query }) {
     const request = { context, deadline };
     let ids = (hints?.ids ?? []).filter(isId).slice(0, MAX_HINTS);
     if (!ids.length) {
@@ -115,7 +115,7 @@ export class BggInternalSource {
       const details = await this._details(id, request);
       if (!details.ok) return { status: "unavailable", reason: details.reason };
       if (details.game) games.push(details.game);
-      const game = pickGame(term, games, intent);
+      const game = this.host.decide({ query, term, intent, games, source: this.id });
       if (game) return { status: "ok", game };
     }
     return { status: "ok", game: null };

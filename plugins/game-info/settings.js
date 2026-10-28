@@ -47,4 +47,14 @@ export const SETTINGS_SCHEMA = [
     default: "true",
     description: "Shows the first few sentences of IGDB's summary under the title.",
   },
+  {
+    key: "debugMatching",
+    fieldset: "Troubleshooting",
+    advanced: true,
+    label: "Explain matching in the log",
+    type: "toggle",
+    default: "false",
+    description:
+      "On: every lookup writes one block to the server log that shows the candidates IGDB returned, how well each name fits, the rating counts, and why the panel showed or not. Rejected title-like queries get one line saying which rule rejected them. Only the query text and game names are logged, never the credentials. Off by default.",
+  },
 ];

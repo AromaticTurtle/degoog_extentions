@@ -74,6 +74,7 @@ export const buildPanel = ({ book, signProxy, showDescription = true }) => {
 
   const summary = showDescription ? summarize(book.description, 300) : "";
   const facts = [
+    fact("Series", esc(book.seriesName ?? "")),
     fact("Pages", esc(book.pages > 0 ? count(book.pages) : "")),
     fact("Published", esc(year)),
     fact("Genres", chips(book.genres)),

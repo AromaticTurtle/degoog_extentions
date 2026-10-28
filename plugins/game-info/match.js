@@ -1,8 +1,13 @@
-// Tuning constants. Popularity is IGDB's rating count (players plus critics).
+// Tuning constants. Popularity is IGDB's rating count (see popularity()). How popular a game must be depends on how
+// specific the query is (see specificity()): a long, distinctive title needs very little, a short generic word a lot.
 export const SUBTITLE_EXACT = 0.88;
-export const EXACT_MIN_POPULARITY = 5;
-export const PREFIX_MIN_POPULARITY = 30;
-export const SUBTITLE_MIN_POPULARITY = 150;
+export const ALT_NAME_LOW_SIMILARITY = 0.85; // a short generic query matching only an alternative name
+export const BARS = {
+  exact: { low: 20, medium: 3, high: 1 }, // the whole title matches
+  prefix: { low: 60, medium: 30, high: 10 }, // the title starts with the query (or the query adds words)
+  subtitle: { low: 150, medium: 100, high: 50 }, // the query is a subtitle ("skyrim")
+};
+export const RANK_BONUS_FACTOR = 0.5; // the first IGDB result that matches closely needs half the popularity
 export const INTENT_MIN_SIMILARITY = 0.9;
 export const INTENT_LOOSE_MIN_SIMILARITY = 0.8;
 export const INTENT_LOOSE_MIN_POPULARITY = 20;
@@ -75,9 +80,45 @@ export const normalizeTitle = (text) =>
     .toLowerCase()
     .replace(/&/g, " and ")
     .replace(/\((?:19|20)\d{2}\)/g, " ")
+    .replace(/['’`]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
     .replace(/^the /, "");
+
+// Series markers, edition marks and the like at the END of a title: "Elden Ring (Deluxe Edition)", "Skyrim Special
+// Edition", "Game of the Year Edition", "Title (2018)", "Title: A Novel".
+const EDITION =
+  "(?:special|anniversary|deluxe|collector'?s|collectors|definitive|complete|digital|enhanced|extended|ultimate|gold|standard|legendary|revised|updated|\\d+(?:st|nd|rd|th) anniversary|game of the year|goty|director'?s cut)\\s+edition";
+const PAREN_TAIL = /\s*[(\[][^()[\]]*[)\]]\s*$/;
+const DECORATIONS = [
+  new RegExp(`\\s*[:,\\-–—]?\\s*(?:the\\s+)?${EDITION}$`, "i"),
+  /\s*[:,\-–—]?\s*(?:hd\s+)?remaster(?:ed)?$/i,
+];
+
+export const stripDecorations = (text) => {
+  const original = String(text ?? "").trim();
+  let value = original;
+  for (let i = 0; i < 4; i += 1) {
+    let next = value.replace(PAREN_TAIL, "");
+    for (const pattern of DECORATIONS) next = next.replace(pattern, "");
+    next = next.trim();
+    if (next === value) break;
+    value = next;
+  }
+  return value || original;
+};
+
+// How distinctive a title is: "skyrim" is low, "elden ring" or "hollow knight" medium, "red dead redemption" high.
+// The more distinctive, the less popularity is needed to be sure it is the game meant.
+export const specificity = (term) => {
+  const stripped = stripDecorations(term);
+  const words = normalizeTitle(stripped).split(" ").filter(Boolean);
+  const chars = words.join("").length;
+  const count = words.length + (/^\s*the\s/i.test(stripped) && words.length ? 1 : 0);
+  if (count >= 3 || chars >= 14) return "high";
+  if (count === 2 || chars >= 8) return "medium";
+  return "low";
+};
 
 const segments = (title) => String(title ?? "").split(/\s*:\s*|\s+[-–—]\s+/);
 
@@ -87,13 +128,14 @@ export const subtitles = (title) => segments(title).slice(1).map(normalizeTitle)
 // "The Elder Scrolls V: Skyrim" -> "elder scrolls v". Tells apart two series that share a subtitle.
 const series = (title) => normalizeTitle(segments(title)[0]);
 
-export const titleSimilarity = (query, title) => {
+// extraWords false: the query may not simply add words to the title ("skyrim vr" is not "Skyrim"). Used for alternative names.
+const plainSimilarity = (query, title, extraWords = true) => {
   const q = normalizeTitle(query);
   const t = normalizeTitle(title);
   if (!q || !t) return 0;
   if (q === t) return 1;
   if (t.startsWith(`${q} `)) return 0.9;
-  if (q.startsWith(`${t} `)) {
+  if (extraWords && q.startsWith(`${t} `)) {
     // "hades 2" must not match "Hades": a trailing number or numeral names a different game.
     const extra = q.slice(t.length + 1).split(" ");
     return extra.some((word) => /\d/.test(word) || /^[ivxl]+$/.test(word)) ? 0.5 : 0.9;
@@ -106,40 +148,130 @@ export const titleSimilarity = (query, title) => {
   return shared / Math.max(qWords.length, t.split(" ").length);
 };
 
-export const popularity = (game) =>
-  Number(game?.totalRatingCount) || (Number(game?.userCount) || 0) + (Number(game?.criticCount) || 0);
+// sim also counts a match that only holds once edition marks are cut off of both sides; raw is the plain match,
+// used to prefer "Skyrim Special Edition" for that query over the base game.
+export const titleMatch = (query, title, extraWords = true) => {
+  const raw = plainSimilarity(query, title, extraWords);
+  const q = stripDecorations(query);
+  const t = stripDecorations(title);
+  if (q === String(query ?? "").trim() && t === String(title ?? "").trim()) return { sim: raw, raw };
+  return { sim: Math.max(raw, plainSimilarity(q, t, extraWords)), raw };
+};
+
+export const titleSimilarity = (query, title) => titleMatch(query, title).sim;
+
+// IGDB has several counts of how many people rated a game. The strongest one wins, so a missing or small count never
+// hides a game that another count shows to be well known.
+export const popularitySignals = (game) => ({
+  total: Math.max(0, Number(game?.totalRatingCount) || 0),
+  users: Math.max(0, Number(game?.userCount) || 0),
+  critics: Math.max(0, Number(game?.criticCount) || 0),
+  combined: Math.max(0, (Number(game?.userCount) || 0) + (Number(game?.criticCount) || 0)),
+});
+export const popularity = (game) => Math.max(0, ...Object.values(popularitySignals(game)));
 
 export const isAcceptedType = (gameType) => {
   const type = String(gameType ?? "").trim().toLowerCase();
   return !type || ACCEPTED_GAME_TYPES.includes(type);
 };
 
-export const isConfidentMatch = (term, game, intent) => {
-  const sim = titleSimilarity(term, game?.name);
-  const pop = popularity(game);
-  if (sim >= 1 && pop >= EXACT_MIN_POPULARITY) return true;
-  if (sim >= 0.9 && pop >= PREFIX_MIN_POPULARITY) return true;
-  if (sim >= SUBTITLE_EXACT && pop >= SUBTITLE_MIN_POPULARITY) return true;
-  if (intent && sim >= INTENT_MIN_SIMILARITY) return true;
-  if (intent && sim >= INTENT_LOOSE_MIN_SIMILARITY && pop >= INTENT_LOOSE_MIN_POPULARITY) return true;
-  return false;
+// Every name a game answers to: its name and its alternative names. A short generic query only trusts an alternative
+// name a little.
+// A name with letters of another script ("Skyrim 上古卷轴") would lose them when normalised and could then match too much,
+// so only names in Latin letters are compared.
+const isLatinName = (name) => !/[^\u0000-\u024f\u2000-\u206f]/.test(name);
+
+const namesOf = (game, band) => [
+  { name: String(game?.name ?? ""), cap: 1, primary: true },
+  ...(Array.isArray(game?.alternatives) ? game.alternatives : [])
+    .map(String)
+    .filter(isLatinName)
+    .map((alternative) => ({ name: alternative, cap: band === "low" ? ALT_NAME_LOW_SIMILARITY : 1, primary: false })),
+];
+
+export const scoreGame = (term, game, band = specificity(term)) => {
+  let best = { sim: 0, raw: 0, name: "", primary: false };
+  for (const { name, cap, primary } of namesOf(game, band)) {
+    const match = titleMatch(term, name, primary);
+    const sim = Math.min(match.sim, cap);
+    const raw = Math.min(match.raw, cap);
+    if (sim > best.sim || (sim === best.sim && raw > best.raw)) best = { sim, raw, name, primary };
+  }
+  return best;
 };
 
-// Several IGDB entries share names (mods, ports, re-releases), so take the closest title, then the most rated.
-// A subtitle-only match ("origins") that fits games of different series is ambiguous, so nothing is shown
-// unless the query also says it is about a game.
-export const pickGame = (term, results, intent) => {
-  const candidates = (Array.isArray(results) ? results : [])
-    .filter((game) => game && game.id && game.name && isAcceptedType(game.gameType) && isConfidentMatch(term, game, intent))
-    .map((game) => ({ game, sim: titleSimilarity(term, game.name) }))
-    .sort((a, b) => b.sim - a.sim || popularity(b.game) - popularity(a.game));
+// The verdict for one candidate: accepted by which rule, or rejected because of what.
+// rank is the position in IGDB's own result list: a first result that matches closely needs half the popularity.
+export const judge = ({ sim, pop, intent, band, rank }) => {
+  const bonus = rank === 0 && sim >= 0.9;
+  const note = bonus ? " (first result)" : "";
+  const scale = (need) => (bonus ? Math.ceil(need * RANK_BONUS_FACTOR) : need);
+  const rules = [
+    { name: "exact title", applies: sim >= 1, need: scale(BARS.exact[band]) },
+    { name: "title prefix", applies: sim >= 0.9, need: scale(BARS.prefix[band]) },
+    { name: "subtitle", applies: sim >= SUBTITLE_EXACT, need: scale(BARS.subtitle[band]) },
+    { name: "intent", applies: intent && sim >= INTENT_MIN_SIMILARITY, need: 0 },
+    { name: "intent (loose)", applies: intent && sim >= INTENT_LOOSE_MIN_SIMILARITY, need: INTENT_LOOSE_MIN_POPULARITY },
+  ];
+  const open = rules.filter((rule) => rule.applies);
+  const hit = open.find((rule) => pop >= rule.need);
+  if (hit) return { accepted: true, rule: `${hit.name}, ${band} specificity${note}`, need: hit.need, have: pop };
+  if (!open.length) return { accepted: false, rule: `similarity ${sim.toFixed(2)} is too low`, need: 0, have: pop };
+  const need = Math.min(...open.map((rule) => rule.need));
+  return { accepted: false, rule: `needs pop>=${need}${note}, has ${pop}`, need, have: pop };
+};
+
+export const isConfidentMatch = (term, game, intent, rank = -1) => {
+  const band = specificity(term);
+  return judge({ sim: scoreGame(term, game, band).sim, pop: popularity(game), intent, band, rank }).accepted;
+};
+
+// Everything that decides whether a game panel shows, with the reasons. Several IGDB entries share names (mods, ports,
+// re-releases), so take the closest title, then the most rated. A subtitle-only match ("origins") that fits games of
+// different series is ambiguous, so nothing is shown unless the query also says it is about a game.
+export const evaluate = (term, results, intent, { explain = false } = {}) => {
+  const band = specificity(term);
+  const rows = [];
+  (Array.isArray(results) ? results : []).forEach((game, rank) => {
+    if (!game || !game.id || !game.name) return;
+    const score = scoreGame(term, game, band);
+    const pop = popularity(game);
+    const typeOk = isAcceptedType(game.gameType);
+    const verdict = typeOk ? judge({ sim: score.sim, pop, intent, band, rank }) : { accepted: false, rule: `game type "${game.gameType}" is not a game of its own`, need: 0, have: pop };
+    rows.push({ game, rank, score, pop, verdict });
+  });
+  const candidates = rows
+    .filter((row) => row.verdict.accepted)
+    .sort((a, b) => b.score.sim - a.score.sim || Number(b.score.primary) - Number(a.score.primary) || b.score.raw - a.score.raw || b.pop - a.pop);
   const best = candidates[0];
-  if (!best) return null;
-  if (!intent && best.sim === SUBTITLE_EXACT && subtitles(best.game.name).includes(normalizeTitle(term))) {
-    const rival = candidates.some((other) => other.sim === best.sim && series(other.game.name) !== series(best.game.name));
-    if (rival) return null;
+  const finish = (pick, how) => ({ pick: pick ?? null, how, band, rows: explain ? rows : [] });
+  if (!best) return finish(null, "no candidate is confident");
+  if (!intent && best.score.sim === SUBTITLE_EXACT && subtitles(best.score.name).includes(normalizeTitle(term))) {
+    const rival = candidates.some((other) => other.score.sim === best.score.sim && series(other.score.name) !== series(best.score.name));
+    if (rival) return finish(null, "the subtitle fits games of different series, so it is ambiguous");
   }
-  return best.game;
+  return finish(best.game, `${best.score.sim >= 1 ? "exact" : "closest"} title: ${best.verdict.rule}`);
+};
+
+export const pickGame = (term, results, intent) => evaluate(term, results, intent).pick;
+
+const oneLine = (value, max = 70) => String(value ?? "").replace(/[\u0000-\u001f\u007f\s]+/g, " ").trim().slice(0, max);
+
+// The explain block of debugMatching: one header, up to six candidates with their popularity signals and the verdict,
+// and the outcome. Only the query and catalog names are in it, nothing secret.
+export const formatExplanation = (query, term, intent, result, source = "igdb") => {
+  const lines = [`[game-info] "${oneLine(query, 100)}" term="${oneLine(term, 100)}" intent=${intent} specificity=${result.band} source=${source}`];
+  for (const row of result.rows.slice(0, 6)) {
+    const signals = Object.entries(popularitySignals(row.game))
+      .filter(([, value]) => value > 0)
+      .map(([name, value]) => `${name}=${value}`)
+      .join(",");
+    const verdict = row.verdict.accepted ? `accepted by ${row.verdict.rule}` : `rejected: ${row.verdict.rule}`;
+    lines.push(`  #${row.rank + 1} "${oneLine(row.game.name)}" sim=${row.score.sim.toFixed(2)} signals[${signals || "none"}] pop=${row.pop} -> ${verdict}`);
+  }
+  if (!result.rows.length) lines.push("  (no candidates)");
+  lines.push(result.pick ? `  => panel: "${oneLine(result.pick.name)}" (${result.how})` : `  => no panel (${result.how})`);
+  return lines.join("\n");
 };
 
 export const cacheKey = (term) => normalizeTitle(term).slice(0, 120);

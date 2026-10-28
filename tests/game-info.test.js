@@ -30,19 +30,27 @@ import {
 import { TokenError, TokenStore, tokenFile } from "../plugins/game-info/token.js";
 import {
   ACCEPTED_GAME_TYPES,
+  BARS,
   SUBTITLE_EXACT,
   cacheKey,
+  evaluate,
   extractTerm,
+  formatExplanation,
   hasGameWord,
   isAcceptedType,
   isConfidentMatch,
+  judge,
   looksLikeATitleSearch,
   normalizeTitle,
   pickGame,
   popularity,
+  scoreGame,
+  specificity,
+  stripDecorations,
   subtitles,
   titleSimilarity,
 } from "../plugins/game-info/match.js";
+import { SETTINGS_SCHEMA } from "../plugins/game-info/settings.js";
 import { compactGame, compactProton, compactTimeToBeat, isoDate, steamAppIdOf } from "../plugins/game-info/shape.js";
 import { buildPanel, esc, formatDate, safeUrl, summarize, timeToBeatText } from "../plugins/game-info/render.js";
 import { GameInfoSlot, slot as defaultSlot } from "../plugins/game-info/index.js";
@@ -397,15 +405,17 @@ describe("title matching", () => {
     expect(subtitles("A: B - C")).toEqual(["b", "c"]);
     expect(subtitles("Hades")).toEqual([]);
     expect(titleSimilarity("skyrim", "The Elder Scrolls V: Skyrim")).toBe(SUBTITLE_EXACT);
-    expect(titleSimilarity("skyrim", "The Elder Scrolls V: Skyrim Special Edition")).toBeLessThan(0.5);
+    // an edition mark is cut off, so the Special Edition fits too (pickGame still prefers the base game for "skyrim")
+    expect(titleSimilarity("skyrim", "The Elder Scrolls V: Skyrim Special Edition")).toBe(SUBTITLE_EXACT);
     expect(titleSimilarity("skyrim special edition", "The Elder Scrolls V: Skyrim Special Edition")).toBe(SUBTITLE_EXACT);
     expect(titleSimilarity("skyrim", "The Elder Scrolls V: Skyrim VR")).toBeLessThan(0.5);
   });
 
   test("confidence needs popularity, an unknown fan game does not qualify", () => {
-    expect(isConfidentMatch("elden ring", rated(1, "Elden Ring", 5), false)).toBe(true);
-    expect(isConfidentMatch("elden ring", rated(1, "Elden Ring", 4), false)).toBe(false);
-    expect(isConfidentMatch("elden ring", rated(1, "Elden Ring", 4), true)).toBe(true);
+    // "elden ring" is a medium-specificity query: an exact title needs few ratings (BARS.exact.medium = 3)
+    expect(isConfidentMatch("elden ring", rated(1, "Elden Ring", 3), false)).toBe(true);
+    expect(isConfidentMatch("elden ring", rated(1, "Elden Ring", 2), false)).toBe(false);
+    expect(isConfidentMatch("elden ring", rated(1, "Elden Ring", 1), true)).toBe(true);
     expect(isConfidentMatch("elden ring", rated(1, "Elden Ring: Nightreign", 30), false)).toBe(true);
     expect(isConfidentMatch("elden ring", rated(1, "Elden Ring: Nightreign", 29), false)).toBe(false);
     expect(isConfidentMatch("skyrim", rated(1, "The Elder Scrolls V: Skyrim", 150), false)).toBe(true);
@@ -508,7 +518,7 @@ describe("shaping IGDB data", () => {
     expect(SKYRIM.platformNames).toContain("PC (Microsoft Windows)");
     expect(SKYRIM.summary).toStartWith("Skyrim reimagines");
     expect(SKYRIM).not.toHaveProperty("external_games");
-    expect(Object.keys(SKYRIM)).toHaveLength(21);
+    expect(Object.keys(SKYRIM)).toHaveLength(22);
   });
 
   test("the steam app id comes from external_games, whatever the case of the source, else from a store link", () => {
@@ -544,6 +554,7 @@ describe("shaping IGDB data", () => {
       released: "",
       gameType: "",
       image: "",
+      alternatives: [],
       genres: [],
       platforms: [],
       platformNames: [],
@@ -1397,5 +1408,183 @@ describe("secrets", () => {
       const carriesSecret = JSON.stringify(call.init).includes(SECRET);
       expect(carriesSecret).toBe(kindOf(call.url) === "token");
     }
+  });
+});
+
+// --- Decision quality: regression tests (invented titles) ---
+
+// An IGDB-shaped compact game for an invented title.
+const igdbGame = (id, name, ratings, extra = {}) => compactGame({ id, name, total_rating_count: ratings, game_type: { type: "Main Game" }, ...extra });
+
+describe("specificity bands and edition marks", () => {
+  test("one short word is low, one long word or two words medium, three words or 14+ characters high", () => {
+    expect(specificity("skyrim")).toBe("low");
+    expect(specificity("hades")).toBe("low");
+    expect(specificity("root")).toBe("low");
+    expect(specificity("wingspan")).toBe("medium");
+    expect(specificity("elden ring")).toBe("medium");
+    expect(specificity("the witness")).toBe("medium");
+    expect(specificity("red dead redemption")).toBe("high");
+    expect(specificity("Elden Ring (Deluxe Edition)")).toBe("medium");
+    expect(specificity("")).toBe("low");
+  });
+
+  test("edition marks and parentheticals are ignored on both sides", () => {
+    expect(stripDecorations("Elden Ring (Deluxe Edition)")).toBe("Elden Ring");
+    expect(stripDecorations("Skyrim: Special Edition")).toBe("Skyrim");
+    expect(stripDecorations("Mass Effect Legendary Edition")).toBe("Mass Effect");
+    expect(stripDecorations("Doom Remastered")).toBe("Doom");
+    expect(stripDecorations("Resident Evil 4 (2023)")).toBe("Resident Evil 4");
+    expect(stripDecorations("Final Fantasy VII Remake")).toBe("Final Fantasy VII Remake");
+    expect(titleSimilarity("elden ring", "Elden Ring (Deluxe Edition)")).toBe(1);
+    expect(titleSimilarity("elden ring deluxe edition", "Elden Ring")).toBe(1);
+    expect(titleSimilarity("hollow knight game of the year edition", "Hollow Knight")).toBe(1);
+  });
+
+  test("the numeral rule is not affected: 'hades 2' is not 'Hades'", () => {
+    expect(titleSimilarity("hades 2", "Hades")).toBeLessThan(0.9);
+    expect(titleSimilarity("hades ii", "Hades (Deluxe Edition)")).toBeLessThan(0.9);
+    expect(pickGame("hades 2", [igdbGame(1, "Hades", 5000)], false)).toBeNull();
+  });
+
+  test("specificity lowers the ratings needed for an exact title", () => {
+    expect(BARS.exact.high).toBeLessThan(BARS.exact.medium);
+    expect(BARS.exact.medium).toBeLessThan(BARS.exact.low);
+    for (const band of ["low", "medium", "high"]) {
+      expect(judge({ sim: 1, pop: BARS.exact[band], intent: false, band }).accepted).toBe(true);
+      expect(judge({ sim: 1, pop: BARS.exact[band] - 1, intent: false, band }).accepted).toBe(false);
+    }
+    expect(judge({ sim: 1, pop: 2, intent: false, band: "low" }).rule).toBe("needs pop>=20, has 2");
+  });
+
+  test("the first result that matches closely needs half the ratings, a non-matching one never passes", () => {
+    expect(judge({ sim: 1, pop: 10, intent: false, band: "low", rank: 0 }).accepted).toBe(true);
+    expect(judge({ sim: 1, pop: 10, intent: false, band: "low", rank: 1 }).accepted).toBe(false);
+    expect(judge({ sim: 1, pop: 9, intent: false, band: "low", rank: 0 }).accepted).toBe(false);
+    expect(judge({ sim: 0.5, pop: 99999, intent: false, band: "high", rank: 0 }).accepted).toBe(false);
+    expect(judge({ sim: 0.85, pop: 99999, intent: false, band: "high", rank: 0 }).accepted).toBe(false);
+  });
+});
+
+describe("popularity signals and alternative names", () => {
+  test("the strongest rating count wins and a missing or null count never zeroes the others", () => {
+    expect(popularity({ totalRatingCount: 0, userCount: 0, criticCount: 40 })).toBe(40);
+    expect(popularity({ totalRatingCount: null, userCount: undefined, criticCount: "x" })).toBe(0);
+    expect(popularity({ totalRatingCount: 12, userCount: 30, criticCount: 5 })).toBe(35);
+    expect(popularity({ totalRatingCount: 500, userCount: 1, criticCount: 1 })).toBe(500);
+    expect(popularity({ userCount: 7 })).toBe(7);
+  });
+
+  test("a game known only by a few counts of one kind still passes", () => {
+    const onlyCritics = igdbGame(9, "Wide Tundra Chronicle", 0, { aggregated_rating_count: 12 });
+    expect(pickGame("wide tundra chronicle", [onlyCritics], false)?.id).toBe(9);
+  });
+
+  test("alternative names are compared, but a short generic query trusts them less", () => {
+    const aliased = igdbGame(10, "Lantern Keepers of the Deep", 400, { alternative_names: [{ name: "Delve" }, { name: "深海守护者" }] });
+    expect(aliased.alternatives).toEqual(["Delve", "深海守护者"]);
+    expect(scoreGame("delve", aliased).sim).toBeLessThanOrEqual(0.85); // low specificity cap
+    expect(pickGame("delve", [aliased], false)).toBeNull();
+    const longAlias = igdbGame(11, "Something Unrelated", 400, { alternative_names: [{ name: "Sunken Lantern Archive" }] });
+    expect(pickGame("sunken lantern archive", [longAlias], false)?.id).toBe(11);
+    // a name in another script is never compared (it would lose its letters when normalised)
+    const foreign = igdbGame(12, "Totally Different Game", 4000, { alternative_names: [{ name: "Skyrim 上古卷轴" }] });
+    expect(scoreGame("skyrim", foreign).sim).toBeLessThan(0.5);
+  });
+
+  test("the query may not simply add words to an alternative name ('skyrim vr' is not 'Skyrim')", () => {
+    const base = igdbGame(1, "The Elder Scrolls V: Skyrim", 2000, { alternative_names: [{ name: "Skyrim" }] });
+    const vr = igdbGame(2, "The Elder Scrolls V: Skyrim VR", 300, { alternative_names: [{ name: "Skyrim VR" }] });
+    expect(pickGame("skyrim vr", [base, vr], false)?.id).toBe(2);
+    expect(pickGame("skyrim", [base, vr], false)?.id).toBe(1);
+  });
+});
+
+describe("exact titles with several entries (a game that is also a board game)", () => {
+  const wingspan = [
+    igdbGame(1, "Wingspan", 60, { total_rating_count: 60 }),
+    igdbGame(2, "Wingspan: European Expansion", 8, { game_type: { type: "Standalone Expansion" } }),
+    igdbGame(3, "Wingspan: Oceania Expansion", 4, { game_type: { type: "Expansion" } }),
+    igdbGame(4, "Wingspan Fan Remix", 1, { game_type: { type: "Mod" } }),
+  ];
+
+  test("an exact title of a modest game shows without a keyword", () => {
+    expect(pickGame("wingspan", wingspan, false)?.id).toBe(1);
+    expect(pickGame("wingspan", wingspan, true)?.id).toBe(1);
+  });
+
+  test("a different, less specific copy does not win, and expansions and mods stay out", () => {
+    expect(pickGame("wingspan", wingspan.slice(1), false)).toBeNull();
+    expect(pickGame("wingspan european expansion", wingspan, false)?.id).toBe(2);
+  });
+
+  test("the same name with a digital edition mark still matches the base title", () => {
+    const digital = [igdbGame(5, "Wingspan (Digital Edition)", 80)];
+    expect(pickGame("wingspan", digital, false)?.id).toBe(5);
+  });
+
+  test("generic one-word titles stay quiet unless the game is well known", () => {
+    for (const word of ["Root", "Risk", "Carl", "Hades"]) {
+      expect(pickGame(word.toLowerCase(), [igdbGame(1, word, 6)], false)).toBeNull();
+    }
+    expect(pickGame("hades", [igdbGame(1, "Hades", 4000)], false)?.id).toBe(1);
+  });
+
+  test("'weather' is not a game search", () => {
+    expect(looksLikeATitleSearch("weather")).toBe(false);
+  });
+});
+
+describe("explaining decisions (debugMatching)", () => {
+  test("formatExplanation lists candidates with signals, verdicts and the outcome", () => {
+    const text = formatExplanation("skyrim", "skyrim", false, evaluate("skyrim", compactFixture, false, { explain: true }));
+    const lines = text.split("\n");
+    expect(lines[0]).toBe('[game-info] "skyrim" term="skyrim" intent=false specificity=low source=igdb');
+    expect(lines[1]).toMatch(/^ {2}#1 "The Elder Scrolls V: Skyrim" sim=0\.88 signals\[.*total=\d+.*\] pop=\d+ -> accepted by subtitle, low specificity/);
+    expect(text).toContain('rejected: game type "DLC" is not a game of its own');
+    expect(lines.at(-1)).toMatch(/^ {2}=> panel: "The Elder Scrolls V: Skyrim" \(/);
+    expect(lines.filter((line) => line.startsWith("  #")).length).toBeLessThanOrEqual(6);
+  });
+
+  test("a rejection says what is missing", () => {
+    const text = formatExplanation("hades", "hades", false, evaluate("hades", [igdbGame(1, "Hades", 2)], false, { explain: true }));
+    expect(text).toContain("rejected: needs pop>=10 (first result), has 2");
+    expect(text.split("\n").at(-1)).toMatch(/^ {2}=> no panel/);
+    expect(formatExplanation("x", "x", false, evaluate("x", [], false, { explain: true }))).toContain("(no candidates)");
+  });
+
+  test("hostile names stay on one line each", () => {
+    const many = Array.from({ length: 9 }, (_, i) => igdbGame(i + 1, `Name ${i}\n[injected] ${"x".repeat(300)}`, 3));
+    const lines = formatExplanation("name", "name", false, evaluate("name", many, false, { explain: true })).split("\n");
+    expect(lines.filter((line) => line.startsWith("  #"))).toHaveLength(6);
+    expect(lines.every((line) => !line.startsWith("[injected]"))).toBe(true);
+  });
+
+  test("the slot logs the block only when debugMatching is on, and never the credentials", async () => {
+    const off = make({ clientId: ID, clientSecret: SECRET });
+    expect(await capture(() => off.execute("skyrim", makeContext()))).toEqual([]);
+    const on = make({ clientId: ID, clientSecret: SECRET, debugMatching: "true" });
+    const lines = await capture(() => on.execute("skyrim", makeContext()));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toStartWith('[game-info] "skyrim" term="skyrim"');
+    expect(lines[0]).toContain("=> panel:");
+    for (const secret of [ID, SECRET, "tok-1", "http"]) expect(lines[0]).not.toContain(secret);
+  });
+
+  test("a title-like query the gating rejects gets one line naming the rule, only in debug mode", async () => {
+    const strict = make({ clientId: ID, clientSecret: SECRET, debugMatching: true, requireGameWord: true });
+    const lines = await capture(async () => {
+      expect(strict.trigger("skyrim")).toBe(false);
+      expect(strict.trigger("how to bake bread")).toBe(false);
+    });
+    expect(lines).toEqual(['[game-info] "skyrim" skipped: requireGameWord is on and the query has no game word']);
+    const quiet = make({ clientId: ID, clientSecret: SECRET, requireGameWord: true });
+    expect(await capture(async () => expect(quiet.trigger("skyrim")).toBe(false))).toEqual([]);
+  });
+
+  test("the setting is advanced, off by default and never required", () => {
+    const field = SETTINGS_SCHEMA.find((entry) => entry.key === "debugMatching");
+    expect(field).toMatchObject({ type: "toggle", default: "false", advanced: true });
+    expect(field.required).toBeUndefined();
   });
 });
