@@ -1,0 +1,267 @@
+/* Currency card. Uses degoog's theme variables so it follows the light and dark themes. */
+/* degoog's .command-result adds padding and a max width; the slot panel already pads the card */
+.command-result.currency-result {
+  display: block;
+  max-width: none;
+  padding: 0;
+}
+
+.currency-card {
+  --currency-up: #1e8e3e;
+  --currency-down: #d93025;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+[data-theme="dark"] .currency-card {
+  --currency-up: #81c995;
+  --currency-down: #f28b82;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .currency-card {
+    --currency-up: #81c995;
+    --currency-down: #f28b82;
+  }
+}
+
+.currency-card *,
+.currency-card *::before,
+.currency-card *::after {
+  box-sizing: border-box;
+}
+
+.currency-kicker {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.currency-expression {
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.currency-answer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.currency-value {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.currency-card--panel .currency-value {
+  font-size: 2rem;
+}
+
+.currency-value-code {
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.currency-card .currency-swap {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.currency-card .currency-swap:hover,
+.currency-card .currency-swap:focus-visible {
+  border-color: var(--primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.currency-rate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.currency-card--inline .currency-rate {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.currency-dot {
+  white-space: pre;
+}
+
+.currency-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+
+.currency-stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.currency-stat-label {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.currency-stat-value {
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.currency-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-weight: 600;
+}
+
+.currency-stat-value .currency-change {
+  margin-left: 0;
+}
+
+.currency-change--up {
+  color: var(--currency-up);
+}
+
+.currency-change--down {
+  color: var(--currency-down);
+}
+
+.currency-change-window {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.currency-range-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.currency-range-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.currency-range {
+  display: block;
+  height: 4px;
+}
+
+.currency-range-track {
+  fill: var(--border);
+}
+
+.currency-range-marker {
+  fill: var(--text-primary);
+}
+
+.currency-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 8px;
+}
+
+.currency-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.currency-cell-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.currency-cell-label {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.currency-footer {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.currency-card--panel .currency-footer {
+  padding-top: 4px;
+  border-top: 0;
+  font-size: 0.6875rem;
+}
+
+.currency-footer a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+}
+
+.currency-footer a:hover {
+  color: var(--text-link);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .currency-swap {
+    transition: none;
+  }
+}

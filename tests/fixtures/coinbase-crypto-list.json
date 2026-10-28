@@ -1,0 +1,76 @@
+{
+  "data": [
+    {
+      "asset_id": "a1",
+      "code": "BTC",
+      "name": "Bitcoin",
+      "color": "#123456",
+      "sort_index": 0,
+      "exponent": 8,
+      "type": "crypto"
+    },
+    {
+      "asset_id": "a1",
+      "code": "ETH",
+      "name": "Ethereum",
+      "color": "#123456",
+      "sort_index": 1,
+      "exponent": 8,
+      "type": "crypto"
+    },
+    {
+      "asset_id": "a1",
+      "code": "DOGE",
+      "name": "Dogecoin",
+      "color": "#123456",
+      "sort_index": 2,
+      "exponent": 8,
+      "type": "crypto"
+    },
+    {
+      "asset_id": "a1",
+      "code": "SOL",
+      "name": "Solana",
+      "color": "#123456",
+      "sort_index": 3,
+      "exponent": 8,
+      "type": "crypto"
+    },
+    {
+      "asset_id": "a1",
+      "code": "USDC",
+      "name": "USD Coin",
+      "color": "#123456",
+      "sort_index": 4,
+      "exponent": 8,
+      "type": "crypto"
+    },
+    {
+      "asset_id": "a1",
+      "code": "LINK",
+      "name": "Chainlink",
+      "color": "#123456",
+      "sort_index": 5,
+      "exponent": 8,
+      "type": "crypto"
+    },
+    {
+      "asset_id": "a1",
+      "code": "ONE",
+      "name": "Harmony",
+      "color": "#123456",
+      "sort_index": 6,
+      "exponent": 8,
+      "type": "crypto"
+    },
+    {
+      "asset_id": "a1",
+      "code": "ZZZCOIN",
+      "name": "Zzz Coin",
+      "color": "#123456",
+      "sort_index": 7,
+      "exponent": 8,
+      "type": "crypto"
+    }
+  ]
+}

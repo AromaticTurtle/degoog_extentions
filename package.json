@@ -21,6 +21,30 @@
       "minDegoogVersion": "1.1.0"
     },
     {
+      "path": "plugins/calculator",
+      "name": "Calculator",
+      "description": "Calculator and unit converter card: arithmetic with exact big integers, percentages, functions, number bases and common units. Runs on your server, no upstream. Inline (detailed, above the results) or panel (compact, side column). Replaces the official math plugin.",
+      "version": "1.0.0",
+      "type": "slot",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "plugins/currency",
+      "name": "Currency converter",
+      "description": "Currency conversion card: fiat rates from open.er-api.com (one cached request a day, cross rates computed locally) and crypto prices from Coinbase's public API, with 24 h change and range. Inline (detailed) or panel (compact). No keys.",
+      "version": "1.0.0",
+      "type": "slot",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "plugins/dictionary",
+      "name": "Dictionary",
+      "description": "Dictionary card for explicit questions (define X, X meaning, synonyms of X, how to pronounce X) from the Free Dictionary API (English, Wiktionary CC BY-SA): meanings, examples, synonyms and pronunciation audio. Inline (detailed) or panel (compact). Replaces the official define plugin.",
+      "version": "1.0.0",
+      "type": "slot",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
       "path": "plugins/game-info",
       "name": "Game info (IGDB + ProtonDB)",
       "description": "Video game panel in the side column: IGDB scores, platforms, developer, time to beat, ProtonDB Linux compatibility and a Steam link. Needs free Twitch/IGDB credentials. Cached. When a title is also a board game, shows whichever came first (configurable).",

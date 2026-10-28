@@ -884,7 +884,9 @@ describe("the fallback chain", () => {
     expect(kinds(context)).toEqual(["wd-search", "wd-entities", "geekitems"]);
     expect(out).toEqual(EMPTY);
     expect(slot.sources.internal.budget.used).toBe(3);
-    expect(lines).toEqual(["[board-games] the daily BGG's website API request limit is reached; paused for 60 min"]);
+    // the pause is an hour, or the time left until UTC midnight when that is shorter: the minutes depend on the time of day
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/^\[board-games\] the daily BGG's website API request limit is reached; paused for \d+ min$/);
     expect(slot.trigger("starfall")).toBe(false);
   });
 

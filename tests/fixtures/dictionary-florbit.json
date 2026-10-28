@@ -1,0 +1,154 @@
+[
+  {
+    "word": "florbit",
+    "phonetic": "/ˈflɔːbɪt/",
+    "phonetics": [
+      {
+        "text": "/ˈflɔːbɪt/",
+        "audio": "https://api.dictionaryapi.dev/media/pronunciations/en/florbit-us.mp3",
+        "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File:x.wav",
+        "license": {
+          "name": "BY-SA 4.0",
+          "url": "https://creativecommons.org/licenses/by-sa/4.0"
+        }
+      },
+      {
+        "text": "/ˈflɔːbɪt/",
+        "audio": "https://api.dictionaryapi.dev/media/pronunciations/en/florbit-uk.mp3",
+        "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File:x.wav",
+        "license": {
+          "name": "BY-SA 4.0",
+          "url": "https://creativecommons.org/licenses/by-sa/4.0"
+        }
+      },
+      {
+        "text": "/ˈflɔːbɪt/",
+        "audio": "https://api.dictionaryapi.dev/media/pronunciations/en/florbit-au.mp3",
+        "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File:x.wav",
+        "license": {
+          "name": "BY-SA 4.0",
+          "url": "https://creativecommons.org/licenses/by-sa/4.0"
+        }
+      }
+    ],
+    "meanings": [
+      {
+        "partOfSpeech": "noun",
+        "definitions": [
+          {
+            "definition": "A small invented bell that only exists in this test fixture.",
+            "example": "The florbit rang twice before the tests started.",
+            "synonyms": [
+              "tinkler",
+              "chimelet"
+            ],
+            "antonyms": []
+          },
+          {
+            "definition": "Any made-up object used to check that a list renders.",
+            "synonyms": [],
+            "antonyms": [
+              "real thing"
+            ]
+          },
+          {
+            "definition": "A third invented sense, to be shown.",
+            "synonyms": [],
+            "antonyms": []
+          },
+          {
+            "definition": "A fourth invented sense, hidden by the three-definition limit.",
+            "synonyms": [],
+            "antonyms": []
+          }
+        ],
+        "synonyms": [
+          "chimelet",
+          "pingle"
+        ],
+        "antonyms": [
+          "silence"
+        ]
+      },
+      {
+        "partOfSpeech": "verb",
+        "definitions": [
+          {
+            "definition": "To ring a florbit.",
+            "example": "She florbited the doorway on the way out.",
+            "synonyms": [
+              "tinkle"
+            ],
+            "antonyms": [
+              "muffle"
+            ]
+          }
+        ],
+        "synonyms": [],
+        "antonyms": []
+      },
+      {
+        "partOfSpeech": "adjective",
+        "definitions": [
+          {
+            "definition": "Resembling a florbit in sound.",
+            "synonyms": [],
+            "antonyms": []
+          }
+        ],
+        "synonyms": [],
+        "antonyms": []
+      },
+      {
+        "partOfSpeech": "adverb",
+        "definitions": [
+          {
+            "definition": "In the manner of a florbit.",
+            "synonyms": [],
+            "antonyms": []
+          }
+        ],
+        "synonyms": [],
+        "antonyms": []
+      }
+    ],
+    "license": {
+      "name": "CC BY-SA 3.0",
+      "url": "https://creativecommons.org/licenses/by-sa/3.0"
+    },
+    "sourceUrls": [
+      "https://en.wiktionary.org/wiki/florbit"
+    ]
+  },
+  {
+    "word": "florbit",
+    "phonetic": "/ˈflɔːbɪt/",
+    "phonetics": [
+      {
+        "text": "/ˈflɔːbɪt/",
+        "audio": ""
+      }
+    ],
+    "meanings": [
+      {
+        "partOfSpeech": "noun",
+        "definitions": [
+          {
+            "definition": "A second, unrelated invented sense in a second entry.",
+            "synonyms": [],
+            "antonyms": []
+          }
+        ],
+        "synonyms": [],
+        "antonyms": []
+      }
+    ],
+    "license": {
+      "name": "CC BY-SA 3.0",
+      "url": "https://creativecommons.org/licenses/by-sa/3.0"
+    },
+    "sourceUrls": [
+      "https://en.wiktionary.org/wiki/florbit"
+    ]
+  }
+]

@@ -1,0 +1,267 @@
+/* Dictionary card. Uses degoog's theme variables so it follows the light and dark themes. */
+/* degoog's .command-result adds padding and a max width; the slot panel already pads the card */
+.command-result.dictionary-result {
+  display: block;
+  max-width: none;
+  padding: 0;
+}
+
+.dictionary-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.dictionary-card *,
+.dictionary-card *::before,
+.dictionary-card *::after {
+  box-sizing: border-box;
+}
+
+.dictionary-kicker {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dictionary-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+}
+
+.dictionary-word {
+  min-width: 0;
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.dictionary-card--panel .dictionary-word {
+  font-size: 2rem;
+}
+
+.dictionary-pron {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dictionary-phonetic {
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+.dictionary-audio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dictionary-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.dictionary-play svg {
+  margin-left: 1px;
+}
+
+.dictionary-play:hover,
+.dictionary-play:focus-visible {
+  border-color: var(--primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.dictionary-play.is-playing {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--bg-light);
+}
+
+.dictionary-play[data-failed="true"] {
+  opacity: 0.5;
+}
+
+.dictionary-accent {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.dictionary-note {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.dictionary-meanings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.dictionary-pos {
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-style: italic;
+  font-weight: 600;
+}
+
+.dictionary-defs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding-left: 24px;
+}
+
+.dictionary-def {
+  padding-left: 4px;
+}
+
+.dictionary-def::marker {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.dictionary-def-text {
+  display: block;
+  font-size: 0.9375rem;
+}
+
+.dictionary-example {
+  display: block;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.dictionary-label {
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dictionary-chips-block {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.dictionary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dictionary-card .dictionary-chip {
+  display: inline-block;
+  max-width: 100%;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.dictionary-card .dictionary-chip:hover,
+.dictionary-card .dictionary-chip:focus-visible {
+  border-color: var(--primary);
+  color: var(--text-link);
+  outline: none;
+}
+
+.dictionary-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dictionary-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dictionary-pos-tag {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-style: italic;
+  font-weight: 600;
+}
+
+.dictionary-line-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dictionary-footer {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.dictionary-card--panel .dictionary-footer {
+  padding-top: 4px;
+  border-top: 0;
+  font-size: 0.6875rem;
+}
+
+.dictionary-footer a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+}
+
+.dictionary-footer a:hover {
+  color: var(--text-link);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dictionary-play,
+  .dictionary-chip {
+    transition: none;
+  }
+}

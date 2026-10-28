@@ -1,0 +1,260 @@
+/* Calculator card. Uses degoog's theme variables so it follows the light and dark themes. */
+/* degoog's .command-result adds padding and a max width; the slot panel already pads the card */
+.command-result.calculator-result {
+  display: block;
+  max-width: none;
+  padding: 0;
+}
+
+.calculator-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.calculator-card *,
+.calculator-card *::before,
+.calculator-card *::after {
+  box-sizing: border-box;
+}
+
+.calculator-kicker {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calculator-expression {
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.calculator-answer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.calculator-value {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.calculator-value--long {
+  font-size: 1.75rem;
+}
+
+.calculator-value--xlong {
+  font-size: 1.25rem;
+}
+
+.calculator-value--error {
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
+.calculator-value-unit {
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.calculator-card--panel .calculator-value {
+  font-size: 2rem;
+}
+
+.calculator-card--panel .calculator-value--long {
+  font-size: 1.5rem;
+}
+
+.calculator-card--panel .calculator-value--xlong {
+  font-size: 1.125rem;
+}
+
+.calculator-copy {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.calculator-card--panel .calculator-copy {
+  padding: 4px;
+  width: 28px;
+  height: 28px;
+  justify-content: center;
+}
+
+.calculator-copy:hover,
+.calculator-copy:focus-visible {
+  border-color: var(--primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.calculator-copy[data-copied="true"] {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.calculator-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.calculator-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+
+.calculator-chip-label {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.calculator-chip-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calculator-rows {
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.calculator-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.calculator-row + .calculator-row {
+  border-top: 1px solid var(--border);
+}
+
+.calculator-row-label {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calculator-row-value {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.calculator-also {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.calculator-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 8px;
+}
+
+.calculator-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.calculator-cell-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.calculator-cell-label {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.calculator-secondary-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.calculator-secondary-line b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calculator-copy {
+    transition: none;
+  }
+}
