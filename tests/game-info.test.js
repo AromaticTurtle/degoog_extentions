@@ -53,7 +53,7 @@ import {
 import { SETTINGS_SCHEMA } from "../plugins/game-info/settings.js";
 import { compactGame, compactProton, compactTimeToBeat, isoDate, steamAppIdOf } from "../plugins/game-info/shape.js";
 import { buildPanel, esc, formatDate, safeUrl, summarize, timeToBeatText } from "../plugins/game-info/render.js";
-import { BOARD_GAMES_LOOKUP, GameInfoSlot, boardWaitFromSetting, slot as defaultSlot } from "../plugins/game-info/index.js";
+import { BOARD_GAMES_LOOKUP, GAME_INFO_LOOKUP, GameInfoSlot, boardWaitFromSetting, slot as defaultSlot } from "../plugins/game-info/index.js";
 
 const read = (path) => Bun.file(new URL(path, import.meta.url));
 const gamesFixture = await read("./fixtures/igdb-games.json").json();
@@ -68,6 +68,9 @@ const SECRET = "test-client-secret-7f3a9c";
 const folders = [];
 afterEach(() => {
   while (folders.length) rmSync(folders.pop(), { recursive: true, force: true });
+  // the two plugins register lookup functions on globalThis in init(); one test must not see another's
+  delete globalThis[Symbol.for("degoog-extentions.board-games.lookup")];
+  delete globalThis[Symbol.for("degoog-extentions.game-info.lookup")];
 });
 const tempFolder = () => {
   const folder = mkdtempSync(join(tmpdir(), "game-info-"));
@@ -1565,10 +1568,12 @@ describe("explaining decisions (debugMatching)", () => {
     expect(await capture(() => off.execute("skyrim", makeContext()))).toEqual([]);
     const on = make({ clientId: ID, clientSecret: SECRET, debugMatching: "true" });
     const lines = await capture(() => on.execute("skyrim", makeContext()));
-    expect(lines).toHaveLength(1);
+    // the explain block, then one line saying that no board games plugin is there
+    expect(lines).toHaveLength(2);
     expect(lines[0]).toStartWith('[game-info] "skyrim" term="skyrim"');
     expect(lines[0]).toContain("=> panel:");
-    for (const secret of [ID, SECRET, "tok-1", "http"]) expect(lines[0]).not.toContain(secret);
+    expect(lines[1]).toBe('[game-info] "skyrim" video game shown: the board games plugin is not available');
+    for (const secret of [ID, SECRET, "tok-1", "http"]) for (const line of lines) expect(line).not.toContain(secret);
   });
 
   test("a title-like query the gating rejects gets one line naming the rule, only in debug mode", async () => {
@@ -1702,21 +1707,34 @@ describe("preferring the board game panel", () => {
     expect(out.title).toBe("The Elder Scrolls V: Skyrim");
   });
 
-  test("with preferBoardGames off the lookup is never called", async () => {
-    for (const value of ["false", false]) {
+  test("the old preferBoardGames key is ignored; the select whenBothMatch decides", async () => {
+    for (const value of ["false", false, "true"]) {
       const board = fakeBoard(MATCH);
       const slot = withBoard({ preferBoardGames: value }, board);
+      expect(slot.whenBoth).toBe("oldest");
+      expect(await slot.execute("skyrim", makeContext())).toEqual(EMPTY); // MATCH has no year: the board game wins
+      expect(board.calls).toHaveLength(1);
+    }
+    expect(make().whenBoth).toBe("oldest");
+    const field = SETTINGS_SCHEMA.find((entry) => entry.key === "whenBothMatch");
+    expect(field).toMatchObject({ type: "select", default: "oldest", fieldset: "Display", options: ["oldest", "board-game", "video-game", "both"] });
+    expect(field.optionLabels).toEqual(["Whichever came first (by release year)", "Always the board game", "Always the video game", "Show both panels"]);
+    expect(field.required).toBeUndefined();
+    expect(SETTINGS_SCHEMA.some((entry) => entry.key === "preferBoardGames")).toBe(false);
+  });
+
+  test("the modes that settle it without asking never call the lookup", async () => {
+    for (const mode of ["video-game", "both"]) {
+      const board = fakeBoard(MATCH);
+      const slot = withBoard({ whenBothMatch: mode }, board);
       expect((await slot.execute("skyrim", makeContext())).title).toBe("The Elder Scrolls V: Skyrim");
       expect(board.calls).toHaveLength(0);
     }
-    const on = fakeBoard(MATCH);
-    expect(await withBoard({ preferBoardGames: "true" }, on).execute("skyrim", makeContext())).toEqual(EMPTY);
-    expect(on.calls).toHaveLength(1);
-    expect(make().preferBoardGames).toBe(true);
-    const field = SETTINGS_SCHEMA.find((entry) => entry.key === "preferBoardGames");
-    expect(field).toMatchObject({ type: "toggle", default: "true" });
-    expect(field.required).toBeUndefined();
-    expect(field.description).toContain("show the board game panel and hide this one");
+    const board = fakeBoard(MATCH);
+    expect(await withBoard({ whenBothMatch: "board-game" }, board).execute("skyrim", makeContext())).toEqual(EMPTY);
+    expect(board.calls).toHaveLength(1);
+    // an unknown value is the default
+    expect(withBoard({ whenBothMatch: "nonsense" }, null).whenBoth).toBe("oldest");
   });
 
   test("a video-game-specific word skips the check entirely and keeps the video game", async () => {
@@ -1792,12 +1810,12 @@ describe("preferring the board game panel", () => {
   test("debugMatching logs one line saying which board game won, or why the video game stayed, and no secrets", async () => {
     const loud = withBoard({ debugMatching: "true" }, fakeBoard(MATCH));
     const lines = await capture(() => loud.execute("skyrim", makeContext()));
-    expect(lines.filter((line) => line.includes("hidden, a board game matches"))).toEqual(['[game-info] "skyrim" hidden, a board game matches: "Skyrim: The Board Game" (id 900123)']);
+    expect(lines.filter((line) => line.includes("both match"))).toEqual(['[game-info] "skyrim" both match: board "Skyrim: The Board Game" (year unknown) vs video "The Elder Scrolls V: Skyrim" 2011, mode=oldest -> showing board']);
     const stayed = withBoard({ debugMatching: "true" }, fakeBoard({ status: "unknown" }));
     const other = await capture(() => stayed.execute("skyrim", makeContext()));
-    expect(other.some((line) => line === '[game-info] "skyrim" shown, board game lookup: unknown')).toBe(true);
+    expect(other.some((line) => line === '[game-info] "skyrim" video game shown: board game lookup unknown or too slow')).toBe(true);
     const absent = withBoard({ debugMatching: "true" }, null);
-    expect((await capture(() => absent.execute("skyrim", makeContext()))).some((line) => line.includes("board game lookup"))).toBe(false);
+    expect((await capture(() => absent.execute("skyrim", makeContext()))).some((line) => line.includes("board games plugin is not available"))).toBe(true);
     for (const line of [...lines, ...other]) {
       for (const secret of [ID, SECRET, "tok-1", "http"]) expect(line).not.toContain(secret);
     }
@@ -1809,7 +1827,7 @@ describe("preferring the board game panel", () => {
   test("hostile names from the other plugin are cleaned before they reach the log", async () => {
     const hostile = withBoard({ debugMatching: "true" }, fakeBoard({ status: "match", name: `Bad\n[injected] ${"x".repeat(300)}`, id: "9<script>\n1" }));
     const lines = await capture(() => hostile.execute("skyrim", makeContext()));
-    const line = lines.find((entry) => entry.includes("hidden"));
+    const line = lines.find((entry) => entry.includes("both match"));
     expect(line.includes("\n")).toBe(false);
     expect(line).not.toContain("<script>");
     expect(line.length).toBeLessThan(250);
@@ -1829,9 +1847,9 @@ describe("how long to wait for the board game answer (boardGameWaitSeconds)", ()
     return calls[0];
   };
 
-  test("the setting is an advanced number, 5 seconds by default, shown only while the preference is on", () => {
+  test("the setting is an advanced number, 5 seconds by default, shown only while the mode asks the board game plugin", () => {
     const field = SETTINGS_SCHEMA.find((entry) => entry.key === "boardGameWaitSeconds");
-    expect(field).toMatchObject({ type: "number", default: "5", advanced: true, visibleWhen: { key: "preferBoardGames", equals: "true" } });
+    expect(field).toMatchObject({ type: "number", default: "5", advanced: true, visibleWhen: { key: "whenBothMatch", equals: ["oldest", "board-game"] } });
     expect(field.required).toBeUndefined();
     expect(make().boardWaitMs).toBe(5000);
   });
@@ -1856,5 +1874,257 @@ describe("how long to wait for the board game answer (boardGameWaitSeconds)", ()
     expect(await waitFor({ boardGameWaitSeconds: "99" })).toBeLessThanOrEqual(8000);
     expect(await waitFor({ boardGameWaitSeconds: "6" }, 3000)).toBeLessThanOrEqual(3000); // 70 % of the slot time is the limit
     expect(await waitFor({})).toBeLessThanOrEqual(5000);
+  });
+});
+
+// --- When both match: whichever came first (the fixture's Skyrim is a video game from 2011) ---
+
+describe("the game-info lookup contract (lookupTitle)", () => {
+  const ask = (slot, term, context, deadlineMs = 2500) => slot.lookupTitle({ term, deadlineMs, context });
+  const SKYRIM_MATCH = { status: "match", name: "The Elder Scrolls V: Skyrim", id: "472", year: 2011, mode: "oldest" };
+
+  test("the symbol is the documented one; init registers, replaces and is safe to repeat; a reloaded module clears it", async () => {
+    expect(GAME_INFO_LOOKUP).toBe(Symbol.for("degoog-extentions.game-info.lookup"));
+    const first = make();
+    first.init({});
+    expect(typeof globalThis[GAME_INFO_LOOKUP]).toBe("function");
+    const before = globalThis[GAME_INFO_LOOKUP];
+    first.init({});
+    expect(globalThis[GAME_INFO_LOOKUP]).toBe(before);
+    const second = make({ clientId: ID, clientSecret: SECRET });
+    second.init({});
+    expect(globalThis[GAME_INFO_LOOKUP]).not.toBe(before);
+    expect(await globalThis[GAME_INFO_LOOKUP]({ term: "skyrim", deadlineMs: 1000, context: makeContext() })).toEqual(SKYRIM_MATCH);
+    await import("../plugins/game-info/index.js?reloaded=1");
+    expect(globalThis[GAME_INFO_LOOKUP]).toBeUndefined();
+    first.init({});
+    expect(typeof globalThis[GAME_INFO_LOOKUP]).toBe("function");
+  });
+
+  test("match carries the name, id, release year and the configured mode; none and unknown are plain", async () => {
+    const slot = make();
+    expect(await ask(slot, "skyrim", makeContext())).toEqual(SKYRIM_MATCH);
+    for (const mode of ["board-game", "video-game", "both"]) {
+      expect((await ask(make({ clientId: ID, clientSecret: SECRET, whenBothMatch: mode }), "skyrim", makeContext())).mode).toBe(mode);
+    }
+    expect((await ask(make({ clientId: ID, clientSecret: SECRET, whenBothMatch: "nonsense" }), "skyrim", makeContext())).mode).toBe("oldest");
+    expect(await ask(make(), "zzz nothing", makeContext({ search: [] }))).toEqual({ status: "none" });
+    expect(await ask(make(), "ring of gone", makeContext())).toEqual({ status: "none" }); // results, but no confident one
+    expect(Object.isFrozen(await ask(make(), "zzz nothing", makeContext({ search: [] })))).toBe(true);
+  });
+
+  test("the year is the year of IGDB's first release date, 0 when unknown", async () => {
+    const dated = (extra) => makeContext({ search: [{ ...gamesFixture[0], ...extra }] });
+    expect((await ask(make(), "skyrim", dated({ first_release_date: Date.UTC(2021, 5, 1) / 1000 }))).year).toBe(2021);
+    expect((await ask(make(), "skyrim", dated({ first_release_date: Date.UTC(2020, 11, 31, 23, 59) / 1000 }))).year).toBe(2020); // UTC
+    expect((await ask(make(), "skyrim", dated({ first_release_date: undefined }))).year).toBe(0);
+    expect((await ask(make(), "skyrim", dated({ first_release_date: "soon" }))).year).toBe(0);
+    expect((await ask(make(), "skyrim", dated({ first_release_date: -5 }))).year).toBe(0);
+  });
+
+  test("it is only the search and the pick: no time to beat, Steam or ProtonDB request", async () => {
+    const context = makeContext();
+    await ask(make(), "skyrim", context);
+    expect(kinds(context)).toEqual(["token", "search"]);
+  });
+
+  test("unknown, with no request at all, without credentials, when disabled, paused, or the gating would refuse the term", async () => {
+    const nothing = makeContext();
+    expect(await ask(make({ clientId: "", clientSecret: "" }), "skyrim", nothing)).toEqual({ status: "unknown" });
+    expect(await ask(make({ clientId: ID, clientSecret: "" }), "skyrim", nothing)).toEqual({ status: "unknown" });
+    expect(await ask(make({ clientId: ID, clientSecret: SECRET, disabled: "true" }), "skyrim", nothing)).toEqual({ status: "unknown" });
+    expect(await ask(make({ clientId: ID, clientSecret: SECRET, requireGameWord: "true" }), "skyrim", nothing)).toEqual({ status: "unknown" });
+    expect(await ask(make(), "skyrim board game", nothing)).toEqual({ status: "unknown" });
+    expect(await ask(make(), "how to bake bread", nothing)).toEqual({ status: "unknown" });
+    expect(await ask(make(), "x", nothing)).toEqual({ status: "unknown" });
+    const paused = make();
+    await capture(async () => paused._pause("igdb", 60_000, "test pause"));
+    expect(await ask(paused, "skyrim", nothing)).toEqual({ status: "unknown" });
+    expect(nothing.calls).toHaveLength(0);
+  });
+
+  test("a failing upstream is unknown, and it never throws, whatever it is given", async () => {
+    const down = makeContext({ respond: (kind) => (kind === "search" ? new Response("down", { status: 503 }) : undefined) });
+    await capture(async () => expect(await ask(make(), "skyrim", down)).toEqual({ status: "unknown" }));
+    const slot = make();
+    for (const request of [undefined, null, {}, { term: null }, { term: 5 }, { term: {} }, { term: "skyrim", deadlineMs: "soon" }, { term: "x".repeat(5000) }]) {
+      expect(["match", "none", "unknown"]).toContain((await slot.lookupTitle(request)).status);
+    }
+    const throwing = { ...makeContext(), fetch: async () => { throw new Error("down"); } };
+    await capture(async () => expect(await ask(make(), "skyrim", throwing)).toEqual({ status: "unknown" }));
+    const boom = make();
+    boom._pickFor = async () => { throw new Error("boom"); };
+    expect(await ask(boom, "skyrim", makeContext())).toEqual({ status: "unknown" });
+  });
+
+  test("it shares the IGDB search with execute(): one upstream search when both run, none for a repeat", async () => {
+    const slot = make();
+    slot.boardLookup = () => undefined;
+    const context = makeContext();
+    const [panel, outcome] = await Promise.all([slot.execute("skyrim", context), ask(slot, "skyrim", context)]);
+    expect(panel.title).toBe("The Elder Scrolls V: Skyrim");
+    expect(outcome.status).toBe("match");
+    expect(count(context, "search")).toBe(1);
+    expect(count(context, "token")).toBe(1);
+    context.calls.length = 0;
+    expect((await ask(slot, "skyrim", context)).status).toBe("match");
+    expect((await slot.execute("skyrim", context)).title).toBe("The Elder Scrolls V: Skyrim");
+    expect(count(context, "search")).toBe(0);
+    // lookup first, execute afterwards
+    const other = make();
+    other.boardLookup = () => undefined;
+    const again = makeContext();
+    expect((await ask(other, "skyrim", again)).status).toBe("match");
+    expect((await other.execute("skyrim", again)).title).toBe("The Elder Scrolls V: Skyrim");
+    expect(count(again, "search")).toBe(1);
+  });
+
+  test("it waits at most deadlineMs, and the late reply still fills the cache", async () => {
+    const slot = make();
+    const context = makeContext();
+    const realFetch = context.fetch;
+    context.fetch = async (url, init) => {
+      if (kindOf(url) === "search") await new Promise((resolve) => setTimeout(resolve, 120));
+      return realFetch(url, init);
+    };
+    const started = Date.now();
+    expect(await ask(slot, "skyrim", context, 25)).toEqual({ status: "unknown" });
+    expect(Date.now() - started).toBeLessThan(100);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(await ask(slot, "skyrim", context, 25)).toEqual(SKYRIM_MATCH);
+    expect(count(context, "search")).toBe(1);
+    // a deadline of zero or less makes no request
+    const none = makeContext();
+    expect(await ask(make(), "skyrim", none, 0)).toEqual({ status: "unknown" });
+    expect(none.calls).toHaveLength(0);
+  });
+
+  test("after execute() gave up on a slow title the lookup does not promise a video game panel that will not come", async () => {
+    const slot = make();
+    slot.boardLookup = () => undefined;
+    slot.answerWindowMs = 20;
+    const context = makeContext();
+    const realFetch = context.fetch;
+    context.fetch = async (url, init) => {
+      if (kindOf(url) === "search") await new Promise((resolve) => setTimeout(resolve, 120));
+      return realFetch(url, init);
+    };
+    expect(await slot.execute("skyrim", context)).toEqual(EMPTY);
+    expect(await ask(slot, "skyrim", context, 1000)).toEqual({ status: "unknown" });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect((await ask(slot, "skyrim", context, 1000)).status).toBe("match");
+    expect((await slot.execute("skyrim", context)).title).toBe("The Elder Scrolls V: Skyrim");
+  });
+
+  test("the answer window follows the slot timeout", async () => {
+    await withEnv({ DEGOOG_SLOT_TIMEOUT_MS: undefined }, () => expect(new GameInfoSlot().answerWindowMs).toBe(9500));
+    await withEnv({ DEGOOG_SLOT_TIMEOUT_MS: "20000" }, () => expect(new GameInfoSlot().answerWindowMs).toBe(19000));
+  });
+
+  test("it never calls the board games lookup: no recursion", async () => {
+    const calls = [];
+    const slot = make();
+    slot.boardLookup = () => async (request) => {
+      calls.push(request);
+      return { status: "match", name: "x", id: "1", year: 1990 };
+    };
+    for (const term of ["skyrim", "zzz nothing", "skyrim board game"]) await ask(slot, term, makeContext());
+    expect(calls).toHaveLength(0);
+  });
+
+  test("answers carry no urls or secrets, and debugMatching logs one line per question", async () => {
+    const outcome = await ask(make(), "skyrim", makeContext());
+    expect(Object.keys(outcome).sort()).toEqual(["id", "mode", "name", "status", "year"]);
+    for (const secret of [ID, SECRET, "tok-1", "http"]) expect(JSON.stringify(outcome)).not.toContain(secret);
+    const quiet = make();
+    expect(await capture(() => ask(quiet, "skyrim", makeContext()))).toEqual([]);
+    const loud = make({ clientId: ID, clientSecret: SECRET, debugMatching: "true" });
+    const lines = await capture(() => ask(loud, "skyrim", makeContext()));
+    expect(lines).toEqual(['[game-info] "skyrim" asked about by board-games: match "The Elder Scrolls V: Skyrim" 2011']);
+  });
+});
+
+describe("whichever came first, seen from game-info", () => {
+  const board = (answer) => {
+    const calls = [];
+    return { calls, lookup: async (request) => { calls.push(request); return typeof answer === "function" ? answer(request) : answer; } };
+  };
+  const run = async (settings, answer, query = "skyrim") => {
+    const fake = board(answer);
+    const slot = make({ clientId: ID, clientSecret: SECRET, ...settings });
+    slot.boardLookup = () => fake.lookup;
+    const out = await slot.execute(query, makeContext());
+    return { out, calls: fake.calls, shown: Boolean(out.html) };
+  };
+  const match = (year, extra = {}) => ({ status: "match", name: "Skyrim: The Board Game", id: "900123", year, ...extra });
+
+  test("a board game released after the video game (2011) leaves the video game", async () => {
+    expect((await run({}, match(2023))).shown).toBe(true);
+    expect((await run({}, match(2012))).shown).toBe(true);
+  });
+
+  test("a board game released before the video game hides the video game", async () => {
+    const { shown, calls } = await run({}, match(2005));
+    expect(shown).toBe(false);
+    expect(calls).toHaveLength(1);
+  });
+
+  test("a tie, an unknown or an invalid year goes to the board game", async () => {
+    for (const year of [2011, 0, undefined, null, "", "soon", -3, NaN]) expect((await run({}, match(year))).shown).toBe(false);
+  });
+
+  test("a string year from the other plugin is read as a year", async () => {
+    expect((await run({}, match("2023"))).shown).toBe(true);
+    expect((await run({}, match("2005"))).shown).toBe(false);
+  });
+
+  test("the modes: board-game always hides, video-game and both always show without asking", async () => {
+    expect((await run({ whenBothMatch: "board-game" }, match(2023))).shown).toBe(false);
+    for (const mode of ["video-game", "both"]) {
+      const result = await run({ whenBothMatch: mode }, match(1990));
+      expect(result.shown).toBe(true);
+      expect(result.calls).toHaveLength(0);
+    }
+  });
+
+  test("none, unknown, anything odd, a throw and an absent plugin show the video game", async () => {
+    for (const answer of [{ status: "none" }, { status: "unknown" }, undefined, null, "match", 5, {}]) expect((await run({}, answer)).shown).toBe(true);
+    const slot = make();
+    slot.boardLookup = () => async () => { throw new Error("boom"); };
+    expect((await slot.execute("skyrim", makeContext())).title).toBe("The Elder Scrolls V: Skyrim");
+    expect((await make().execute("skyrim", makeContext())).title).toBe("The Elder Scrolls V: Skyrim");
+  });
+
+  test("video-specific words never ask, and a hidden video game makes no follow-up request", async () => {
+    for (const query of ["skyrim ps5", "skyrim walkthrough", "skyrim steam"]) {
+      const result = await run({}, match(1990), query);
+      expect(result.shown).toBe(true);
+      expect(result.calls).toHaveLength(0);
+    }
+    const fake = board(match(1990));
+    const slot = make();
+    slot.boardLookup = () => fake.lookup;
+    const context = makeContext();
+    expect(await slot.execute("skyrim", context)).toEqual(EMPTY);
+    expect(kinds(context)).toEqual(["token", "search"]);
+  });
+
+  test("the lookup gets the term, the context and a deadline within the configured wait and the slot budget", async () => {
+    const { calls } = await run({ boardGameWaitSeconds: "3" }, { status: "none" }, "skyrim game");
+    expect(calls[0].term).toBe("skyrim");
+    expect(calls[0].deadlineMs).toBeLessThanOrEqual(3000);
+    expect(calls[0].deadlineMs).toBeGreaterThan(2500);
+  });
+
+  test("debug lines: both match, and why the video game stayed", async () => {
+    const lines = await capture(() => run({ debugMatching: "true" }, match(2005)));
+    expect(lines.filter((line) => line.includes("both match"))).toEqual(['[game-info] "skyrim" both match: board "Skyrim: The Board Game" 2005 vs video "The Elder Scrolls V: Skyrim" 2011, mode=oldest -> showing board']);
+    const video = await capture(() => run({ debugMatching: "true" }, match(2023)));
+    expect(video.some((line) => line.endsWith("-> showing video"))).toBe(true);
+    const skipped = await capture(() => run({ debugMatching: "true", whenBothMatch: "both" }, match(2005)));
+    expect(skipped).toContain('[game-info] "skyrim" board game lookup skipped: mode=both');
+    const timed = await capture(() => run({ debugMatching: "true" }, { status: "unknown" }));
+    expect(timed).toContain('[game-info] "skyrim" video game shown: board game lookup unknown or too slow');
+    for (const line of [...lines, ...video, ...skipped, ...timed]) for (const secret of [ID, SECRET, "tok-1", "http"]) expect(line).not.toContain(secret);
   });
 });

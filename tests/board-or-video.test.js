@@ -123,3 +123,81 @@ describe("the two plugins classify queries the same way", () => {
     expect(video.extractTerm("game dev tycoon")).toBe("game dev tycoon");
   });
 });
+
+// ---- When both match: the decision, identical in both plugins ----
+
+describe("decideBothMatch", () => {
+  const same = (input) => {
+    const a = video.decideBothMatch(input);
+    const b = board.decideBothMatch(input);
+    expect(b).toBe(a);
+    return a;
+  };
+
+  // mode, board year, video year, expected panel
+  const CASES = [
+    // the four examples of the rule
+    ["oldest", 2023, 2016, "video"], // Stardew Valley: the video game came first
+    ["oldest", 2019, 2020, "board"], // Wingspan
+    ["oldest", 2017, 2019, "board"], // Gloomhaven
+    ["oldest", 1979, 1992, "board"], // Dune
+    // ties and unknown years go to the board game
+    ["oldest", 2020, 2020, "board"],
+    ["oldest", 0, 2016, "board"],
+    ["oldest", 2019, 0, "board"],
+    ["oldest", 0, 0, "board"],
+    ["oldest", undefined, 2016, "board"],
+    ["oldest", 2023, undefined, "board"],
+    ["oldest", null, null, "board"],
+    ["oldest", -2016, 2019, "board"],
+    ["oldest", 2019, -2016, "board"],
+    ["oldest", NaN, 2016, "board"],
+    ["oldest", 2023, Number.NaN, "board"],
+    ["oldest", Infinity, 2016, "board"],
+    ["oldest", 2019.5, 2016, "board"],
+    ["oldest", 2023, 2016.5, "board"],
+    ["oldest", "soon", 2016, "board"],
+    ["oldest", 2023, "", "board"],
+    ["oldest", {}, 2016, "board"],
+    ["oldest", [], 2016, "board"],
+    ["oldest", 12345, 2016, "board"], // not a year
+    // years as digit strings are read as years
+    ["oldest", "2023", "2016", "video"],
+    ["oldest", "2019", 2020, "board"],
+    ["oldest", 2023, " 2016 ", "video"],
+    ["oldest", "2020", "2020", "board"],
+    // the other modes ignore years
+    ["board-game", 2023, 2016, "board"],
+    ["board-game", 0, 0, "board"],
+    ["video-game", 2016, 2023, "video"],
+    ["video-game", 0, 0, "video"],
+    ["both", 2023, 2016, "both"],
+    ["both", 0, 0, "both"],
+    // an unknown or missing mode is the default
+    [undefined, 2023, 2016, "video"],
+    [null, 2019, 2020, "board"],
+    ["", 2023, 2016, "video"],
+    ["nonsense", 2023, 2016, "video"],
+    ["OLDEST", 2023, 2016, "video"],
+  ];
+  test.each(CASES)("mode %p, board %p, video %p -> %p", (mode, boardYear, videoYear, expected) => {
+    expect(same({ mode, boardYear, videoYear })).toBe(expected);
+  });
+
+  test("missing or odd arguments never throw", () => {
+    for (const input of [undefined, null, {}, 5, "x", []]) expect(same(input)).toBe("board");
+  });
+
+  test("the two copies agree on every combination of a wide grid", () => {
+    const years = [undefined, null, 0, -1, 1, 1979, 1992, 2016, 2019, 2020, 2023, 9999, 10000, "2016", "2023", "", "x", NaN, 2019.5];
+    for (const mode of [...video.WHEN_BOTH_MODES, "x", undefined]) {
+      for (const boardYear of years) for (const videoYear of years) same({ mode, boardYear, videoYear });
+    }
+    expect(video.WHEN_BOTH_MODES).toEqual(["oldest", "board-game", "video-game", "both"]);
+    expect(board.WHEN_BOTH_MODES).toEqual(video.WHEN_BOTH_MODES);
+    expect(board.DEFAULT_WHEN_BOTH).toBe("oldest");
+    expect(video.DEFAULT_WHEN_BOTH).toBe("oldest");
+    for (const value of [...video.WHEN_BOTH_MODES, "x", undefined, null, 5]) expect(board.normalizeWhenBoth(value)).toBe(video.normalizeWhenBoth(value));
+    for (const value of [...years, "0", "00", " 12 ", "20 19"]) expect(board.validYear(value)).toBe(video.validYear(value));
+  });
+});

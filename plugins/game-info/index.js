@@ -16,7 +16,20 @@ import {
   sanitizeTerm,
   steamSearchUrl,
 } from "./request.js";
-import { cacheKey, evaluate, extractTerm, formatExplanation, hasGameWord, hasVideoGameWord, isBoardGameQuery, looksLikeATitleSearch, normalizeTitle } from "./match.js";
+import {
+  cacheKey,
+  decideBothMatch,
+  evaluate,
+  extractTerm,
+  formatExplanation,
+  hasGameWord,
+  hasVideoGameWord,
+  isBoardGameQuery,
+  looksLikeATitleSearch,
+  normalizeTitle,
+  normalizeWhenBoth,
+  validYear,
+} from "./match.js";
 import { compactGame, compactProton, compactTimeToBeat } from "./shape.js";
 import { buildPanel } from "./render.js";
 
@@ -33,6 +46,20 @@ const EMPTY = { title: "", html: "" };
 
 // The board-games plugin (same degoog process) registers a lookup function under this symbol; see its README.
 export const BOARD_GAMES_LOOKUP = Symbol.for("degoog-extentions.board-games.lookup");
+// And this plugin registers its own, so the board-games plugin can ask the other way round. Neither function ever calls
+// the other plugin, so there is no recursion.
+export const GAME_INFO_LOOKUP = Symbol.for("degoog-extentions.game-info.lookup");
+const TIMED_OUT = Symbol("timed out");
+const UNKNOWN = Object.freeze({ status: "unknown" });
+const NONE = Object.freeze({ status: "none" });
+
+// A module that is loaded again (degoog reloads plugins) drops what an earlier copy registered. init() registers the new
+// copy, and only runs when the plugin is enabled, so a disabled plugin never stays registered.
+delete globalThis[GAME_INFO_LOOKUP];
+
+// The release year of a compact game (its ISO "released" date), 0 when unknown.
+const yearOf = (game) => validYear(String(game?.released ?? "").slice(0, 4));
+const clean = (value, max) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 const BOARD_WAIT_DEFAULT_SECONDS = 5;
 const BOARD_WAIT_MIN_SECONDS = 1;
 const BOARD_WAIT_MAX_SECONDS = 8;
@@ -89,11 +116,15 @@ export class GameInfoSlot {
   steamFallback = true;
   showDescription = true;
   debugMatching = false;
-  preferBoardGames = true;
+  whenBoth = "oldest";
+  disabled = false;
   boardWaitMs = BOARD_WAIT_DEFAULT_SECONDS * 1000;
   // degoog gives a slot 10 s (DEGOOG_SLOT_TIMEOUT_MS). The wait for the board game answer never ends after 70 % of it,
   // which leaves the rest for the IGDB follow-up requests.
   startWindowMs = Math.max(1000, Math.round(slotTimeoutMs() * 0.7));
+  // A lookup that is still running shortly before degoog's own timeout is given up on for this search; its work is not
+  // cancelled and fills the cache. The lookup for the other plugin then says "unknown" (no video game panel is coming).
+  answerWindowMs = Math.max(500, Math.round(slotTimeoutMs() * 0.95));
   boardLookup = () => globalThis[BOARD_GAMES_LOOKUP];
   apiBase = process.env.DEGOOG_IGDB_API_BASE || DEFAULT_API_BASE;
   tokenUrl = process.env.DEGOOG_IGDB_TOKEN_URL || DEFAULT_TOKEN_URL;
@@ -111,10 +142,14 @@ export class GameInfoSlot {
   _gateChain = Promise.resolve();
   _local = {};
   _inflight = new Map();
+  _missed = new Set();
 
   init(context) {
     if (context?.template) this.template = context.template;
     if (context?.signProxyUrl) this._signProxy = context.signProxyUrl;
+    // Replaces an earlier registration, so running init more than once is safe.
+    this._lookup ??= (request) => this.lookupTitle(request);
+    globalThis[GAME_INFO_LOOKUP] = this._lookup;
   }
 
   configure(settings = {}) {
@@ -125,7 +160,9 @@ export class GameInfoSlot {
     this.steamFallback = truthy(settings.steamFallback, true);
     this.showDescription = truthy(settings.showDescription, true);
     this.debugMatching = truthy(settings.debugMatching, false);
-    this.preferBoardGames = truthy(settings.preferBoardGames, true);
+    this.whenBoth = normalizeWhenBoth(settings.whenBothMatch);
+    // degoog passes the stored "disabled" flag along with the settings when the user switches the plugin off.
+    this.disabled = truthy(settings.disabled, false);
     this.boardWaitMs = boardWaitFromSetting(settings.boardGameWaitSeconds);
   }
 
@@ -327,12 +364,78 @@ export class GameInfoSlot {
     });
   }
 
-  // Does a board game with the same title match? Only asked after this plugin has a confident pick, never for a query with a
-  // video-game-specific word, and never longer than the time left. Anything but a clear "match" keeps the video game.
-  async _boardGameWins(query, term, context, startedAt) {
-    if (!this.preferBoardGames || hasVideoGameWord(query)) return false;
+  // The confident video game pick for a title, shared with execute() through _search(): -> { answered, game }.
+  async _pickFor(term, context, intent, { explain = false, query = term } = {}) {
+    const results = await this._search(term, context);
+    if (!results) return { answered: false, game: null };
+    const result = evaluate(term, results, intent, { explain });
+    if (explain) console.info(formatExplanation(query, term, intent, result));
+    return { answered: true, game: result.pick };
+  }
+
+  _logLookup(term, outcome) {
+    if (!this.debugMatching) return;
+    const label = outcome.status === "match" ? `match "${clean(outcome.name, 70)}" ${outcome.year || "(year unknown)"}` : outcome.status;
+    console.info(`[game-info] "${clean(term, 100)}" asked about by board-games: ${label}`);
+  }
+
+  // The contract with board-games, the other way round from boardLookup(): is there a confident video game for this
+  // title? Only this plugin's own IGDB search and pick (no time to beat, ProtonDB or Steam request), with the same
+  // single-flight and cache as execute(). Never throws, never calls the other plugin, makes no request without
+  // credentials, and waits at most deadlineMs (a slower reply keeps running and fills the cache).
+  // -> { status: "match", name, id, year, mode } | { status: "none" } | { status: "unknown" }
+  async lookupTitle(request) {
+    try {
+      const { term, deadlineMs, context } = request ?? {};
+      const raw = String(term ?? "").trim();
+      const title = extractTerm(raw);
+      // the gating looks at the term as given: "skyrim board game" is not a video game search, whatever is left of it
+      if (this.disabled || sanitizeTerm(title).length < 2 || this._rejection(raw) || this._rejection(title)) return UNKNOWN;
+      // execute() for this title already gave up and its answer is still on the way: no video game panel this time.
+      if (this._missed.has(cacheKey(title))) {
+        this._logLookup(title, UNKNOWN);
+        return UNKNOWN;
+      }
+      const waitMs = Number.isFinite(deadlineMs) ? Math.max(0, deadlineMs) : this.startWindowMs;
+      if (waitMs <= 0) return UNKNOWN;
+      const work = this._pickFor(title, context, false);
+      let timer;
+      const late = new Promise((resolve) => {
+        timer = setTimeout(() => resolve(TIMED_OUT), waitMs);
+      });
+      let found;
+      try {
+        found = await Promise.race([work, late]);
+      } finally {
+        clearTimeout(timer);
+      }
+      let outcome = UNKNOWN;
+      if (found === TIMED_OUT) work.catch(() => {});
+      else if (found.game) outcome = { status: "match", name: String(found.game.name ?? ""), id: String(found.game.id ?? ""), year: yearOf(found.game), mode: this.whenBoth };
+      else if (found.answered) outcome = NONE;
+      this._logLookup(title, outcome);
+      return outcome;
+    } catch {
+      return UNKNOWN;
+    }
+  }
+
+  // Does a board game with the same title match, and does it win? Only asked after this plugin has a confident pick, never
+  // for a query with a video-game-specific word, never when the setting already settles it ("always the video game",
+  // "show both"), and never longer than the time left. Anything but a clear "match" keeps the video game.
+  async _boardGameWins(query, term, context, startedAt, game) {
+    const mode = this.whenBoth;
+    const say = (text) => this.debugMatching && console.info(`[game-info] "${clean(term, 100)}" ${text}`);
+    if (hasVideoGameWord(query)) return false;
+    if (mode === "video-game" || mode === "both") {
+      say(`board game lookup skipped: mode=${mode}`);
+      return false;
+    }
     const lookup = this.boardLookup();
-    if (typeof lookup !== "function") return false;
+    if (typeof lookup !== "function") {
+      say("video game shown: the board games plugin is not available");
+      return false;
+    }
     const waitMs = Math.min(this.boardWaitMs, startedAt + this.startWindowMs - this.now());
     let outcome = { status: "unknown" };
     if (waitMs >= BOARD_WAIT_MIN_MS) {
@@ -349,29 +452,23 @@ export class GameInfoSlot {
         clearTimeout(timer);
       }
     }
-    if (this.debugMatching) {
-      const name = String(outcome.name ?? "").replace(/\s+/g, " ").trim().slice(0, 70);
-      const id = String(outcome.id ?? "").replace(/[^0-9A-Za-z_-]/g, "").slice(0, 20);
-      const label = outcome.status === "match" ? `hidden, a board game matches: "${name}" (id ${id})` : `shown, board game lookup: ${outcome.status === "none" ? "none" : "unknown"}`;
-      console.info(`[game-info] "${String(query).replace(/\s+/g, " ").trim().slice(0, 100)}" ${label}`);
+    if (outcome.status !== "match") {
+      say(`video game shown: board game lookup ${outcome.status === "none" ? "none" : "unknown or too slow"}`);
+      return false;
     }
-    return outcome.status === "match";
+    const boardYear = validYear(outcome.year);
+    const videoYear = yearOf(game);
+    const shows = decideBothMatch({ mode, boardYear, videoYear });
+    say(`both match: board "${clean(outcome.name, 70)}" ${boardYear || "(year unknown)"} vs video "${clean(game.name, 70)}" ${videoYear || "(year unknown)"}, mode=${mode} -> showing ${shows}`);
+    return shows === "board";
   }
 
-  async execute(query, context) {
-    const startedAt = this.now();
-    if (!this.trigger(query)) return EMPTY;
-    const term = extractTerm(query);
-    if (sanitizeTerm(term).length < 2) return EMPTY;
+  async _render(query, term, context, startedAt) {
     try {
-      const results = await this._search(term, context);
-      if (!results) return EMPTY;
       const intent = hasGameWord(query);
-      const result = evaluate(term, results, intent, { explain: this.debugMatching });
-      if (this.debugMatching) console.info(formatExplanation(query, term, intent, result));
-      const game = result.pick;
-      if (!game) return EMPTY;
-      if (await this._boardGameWins(query, term, context, startedAt)) return EMPTY;
+      const { answered, game } = await this._pickFor(term, context, intent, { explain: this.debugMatching, query });
+      if (!answered || !game) return EMPTY;
+      if (await this._boardGameWins(query, term, context, startedAt, game)) return EMPTY;
       const [ttb, steamAppId] = await Promise.all([this._timeToBeat(game.id, context), this._steamAppId(game, context)]);
       const proton = this.showProtonDb && steamAppId ? await this._proton(steamAppId, context) : null;
       const html = buildPanel({
@@ -386,6 +483,33 @@ export class GameInfoSlot {
     } catch {
       return EMPTY;
     }
+  }
+
+  async execute(query, context) {
+    const startedAt = this.now();
+    if (!this.trigger(query)) return EMPTY;
+    const term = extractTerm(query);
+    if (sanitizeTerm(term).length < 2) return EMPTY;
+    const work = this._render(query, term, context, startedAt);
+    let timer;
+    const late = new Promise((resolve) => {
+      timer = setTimeout(() => resolve(TIMED_OUT), this.answerWindowMs);
+    });
+    let out;
+    try {
+      out = await Promise.race([work, late]);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (out !== TIMED_OUT) return out;
+    const missed = cacheKey(term);
+    this._missed.add(missed);
+    work.then(
+      () => this._missed.delete(missed),
+      () => this._missed.delete(missed),
+    );
+    if (this.debugMatching) console.info(`[game-info] "${clean(query, 100)}" is still being looked up; the reply is cached when it arrives, so searching again in a moment shows the panel`);
+    return EMPTY;
   }
 }
 

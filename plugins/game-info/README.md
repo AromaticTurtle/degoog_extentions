@@ -67,10 +67,11 @@ for 7 days (including "none"). Identical simultaneous searches share a request. 
 - **Show ProtonDB compatibility**: on by default. Off makes no ProtonDB requests at all.
 - **Look up the Steam page when IGDB has none**: on by default. Off makes no Steam store requests; the Steam link then only
   appears when IGDB knows the Steam page.
-- **Prefer the board game panel**: on by default. When a board game with the same title matches, the board game panel shows
-  and this one is hidden (see "Board game or video game?" below).
+- **When a board game and a video game match the same title**: whichever came first (by release year, the default), always the
+  board game, always the video game, or both panels. The Board games plugin follows this one (see "Board game or video
+  game?" below). It replaces the old toggle "Prefer the board game panel" (ignored now; the default changed).
 - **How long to wait for the board game answer** (advanced, 5 seconds, 1 to 8): how long a video game match waits for the Board
-  games plugin before it shows itself. A slow answer is cached, so the board game wins on the next search.
+  games plugin before it shows itself. A slow answer is cached, so later searches are consistent.
 - **Show a short description**: on by default.
 
 ## The sources, and their terms (please read)
@@ -85,37 +86,57 @@ for 7 days (including "none"). Identical simultaneous searches share a request. 
 - Covers are fetched through degoog's own image proxy.
 
 ## Board game or video game?
-Some titles are both (a board game with a digital version, or the other way round). By default **the board game wins**: when
-this plugin has a confident video game match and the **Board games** plugin (same degoog) finds a board game with the same
-title, this panel is hidden and only the board game panel shows. So plain `wingspan` shows the board game, while `skyrim` and
-`elden ring` (video games only) and `catan` (a board game only) behave as before.
+Some titles are both: a board game with a digital version (Wingspan), a video game with a board game adaptation (Stardew
+Valley). When **both** the Game info plugin (this one) and the **Board games** plugin match the same title, **the one that came
+first wins**, by release year:
 
+- Stardew Valley: video game 2016, board game adaptation 2023 -> the **video game** panel shows.
+- Wingspan: board game 2019, video game 2020 -> the **board game** panel shows. Likewise Gloomhaven (board 2017, video 2019) and
+  Dune (board 1979, video 1992).
+- **Tie-breaker:** on the same year, or when either year is unknown or invalid, the **board game** wins.
+- Titles that exist only as a video game (`skyrim`, `elden ring`) or only as a board game (`catan`) behave as before.
+
+| Setting (in **Game info**) | What happens when both match |
+|---|---|
+| **Whichever came first (by release year)**, the default | the earlier release year wins |
+| Always the board game | the board game panel, never the video game panel |
+| Always the video game | the video game panel, never the board game panel |
+| Show both panels | both panels |
+
+- **One setting, here.** **When a board game and a video game match the same title** lives in this plugin only; the Board
+  games plugin follows it (it is told the value whenever it asks). It replaces the old toggle "Prefer the board game panel":
+  **the default changed** (it used to be "always the board game") and the old `preferBoardGames` key is ignored.
 - **Explicit words win.** A word that can only mean a video game (`ps5`, `ps4`, `xbox`, `switch`, `pc`, `steam`, `video game`,
   `gameplay`, `walkthrough`, `dlc`, `mods`, `cheats`, `speedrun`, `patch notes`, `system requirements`, `controller`, `console`,
   `fps`, `remaster(ed)`, `remake`, `rpg`, `roguelike`, `soulslike`) shows this panel and never asks the board game plugin
   (`wingspan ps5`, `elden ring steam`). A word that can only mean a board game (`board game`, `tabletop`, `rules`, `rulebook`,
   `setup`, `expansion`, `bgg`, `meeple`, `card game`, `dice game`, `worker placement`, `deck builder`, `how to play`,
   `player count`, `solo variant`) keeps this panel from showing at all (`wingspan board game`, `catan rules`), unless a
-  video game word is there too.
-- **Ambiguous words decide nothing.** Bare `game`, `guide`, `review`, `wiki`, `trailer`, `release date`, `requirements`,
-  `co-op` and `multiplayer` also fit board games, so `wingspan game` is treated like `wingspan` (the board game wins).
-  The Board games plugin keeps the same lists (a test checks that both plugins classify the same queries the same way).
-- **Setting:** **Prefer the board game panel** (on by default). Off: this plugin never asks, and both panels can show.
+  video game word is there too. Bare `game`, `guide`, `review`, `wiki`, `trailer`, `release date`, `requirements`, `co-op` and
+  `multiplayer` also fit board games, so they decide nothing: `wingspan game` is treated like `wingspan`. The Board games
+  plugin keeps the same lists (a test checks that both classify the same queries the same way).
 - **Without the Board games plugin** (not installed, disabled, no source usable, or its answer is "unknown") nothing changes:
   the video game shows.
-- **How it works:** the Board games plugin registers one function in the degoog process
-  (`globalThis[Symbol.for("degoog-extentions.board-games.lookup")]`). This plugin calls it only after it already has a
-  confident pick, waits at most **5 s** (setting **How long to wait for the board game answer**, 1 to 8 seconds, never past
-  70 % of `DEGOOG_SLOT_TIMEOUT_MS`), and only a clear `match` hides the
-  panel. The two plugins share requests and caches, so asking costs nothing extra. Degoog runs slot plugins one after the
-  other, so it does not matter which runs first (`priority`, then folder name).
-- **A cold first search:** if the board game lookup is slower than the wait (a cold recommend.games or BGG answer takes 1 to 5 s), the video
-  game shows first. The board game's late reply is cached, so the next search for the title shows only the board game.
-- **Troubleshooting:** with **Explain matching in the log** on, the decision is one log line, for example
-  `[game-info] "wingspan" hidden, a board game matches: "Wingspan" (id 266192)` or
-  `[game-info] "wingspan" shown, board game lookup: unknown`.
-- Limit: degoog does not tell a plugin which result tab a panel is shown on, so a board game plugin that is limited to other
-  tabs than this one can still hide this panel.
+- **How it works.** Each plugin registers one lookup function in the degoog process under a global symbol:
+  `Symbol.for("degoog-extentions.game-info.lookup")` (this plugin) and `Symbol.for("degoog-extentions.board-games.lookup")`.
+  Both only look things up and never call the other plugin, so nothing can loop. This plugin's function runs just the IGDB
+  search and pick (no time to beat, ProtonDB or Steam request) and answers `{ status: "match", name, id, year, mode }`, `none`
+  or `unknown`. When a plugin has its own confident pick it asks the other one (waiting at most **5 s** here, 3 s there, never
+  past 70 % of `DEGOOG_SLOT_TIMEOUT_MS`), compares the two release years with the mode above, and the loser returns an empty
+  panel (a hidden video game makes no time-to-beat, Steam or ProtonDB request). The plugins share requests and caches, so asking
+  costs nothing extra, and degoog's order (slots run one after the other, by `priority`, then folder name) does not matter.
+- **The year** of a video game is the year of IGDB's `first_release_date` (UTC). For early-access or alpha entries IGDB can
+  list an earlier date than the commercial release, which can make a video game look older than it is; set the mode to a fixed
+  choice if that bites for a title you search for.
+- **A cold first search:** if the other plugin's answer is slower than the wait (a cold recommend.games or BGG answer takes
+  1 to 5 s), the plugin that waited shows itself. The slow reply is cached, so later searches are consistent. Remaining
+  limitation: on a very slow cold search both panels can show once.
+- **Troubleshooting:** with **Explain matching in the log** on, a both-match decision is one line, for example
+  `[game-info] "wingspan" both match: board "Wingspan" 2019 vs video "Wingspan" 2020, mode=oldest -> showing board`, and the
+  cases where nothing was decided are logged too (`video game shown: the board games plugin is not available`, `... board game
+  lookup unknown or too slow`, `board game lookup skipped: mode=both`). The Board games plugin logs the mirror lines.
+- Limit: degoog does not tell a plugin which result tab a panel is shown on, so a plugin that is limited to other tabs than the
+  other one can still hide it.
 
 ## How the match is decided
 A game with the right title is shown when it has **enough ratings for how specific your query is**: a long, distinctive title
@@ -152,7 +173,8 @@ confident match; nothing saved; output refused if it contains a credential):
   `DEGOOG_IGDB_API_BASE` (`.../v4`), `DEGOOG_IGDB_TOKEN_URL` (`.../oauth2/token`), `DEGOOG_PROTONDB_BASE` and
   `DEGOOG_STEAM_BASE`. It accepts client ID `test-id`, secret `test-secret` and token `test-token`. A search for `starfall`
   also finds an invented video game of that name, the same title as the board game in the board-games mock, to try the
-  "Board game or video game?" rule with both plugins in one degoog.
+  "Board game or video game?" rule with both plugins in one degoog: `starfall` (video 2021, board 2019), `moonharvest` (video
+  2016, board 2023), `tiebreak` (both 2020) and `driftwood` (video year unknown, board 2018).
 - `tests/diagnose-game-info.js` runs one real lookup with your credentials and prints the explain block (see "Troubleshooting").
 - The matching rules and their tuning constants (similarity values, popularity thresholds, accepted IGDB game types) are at
   the top of `match.js`.

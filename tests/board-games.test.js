@@ -66,6 +66,9 @@ const TOKEN = "test-bgg-token-5d7e1b9c2a";
 const folders = [];
 afterEach(() => {
   while (folders.length) rmSync(folders.pop(), { recursive: true, force: true });
+  // the two plugins register lookup functions on globalThis in init(); one test must not see another's
+  delete globalThis[Symbol.for("degoog-extentions.board-games.lookup")];
+  delete globalThis[Symbol.for("degoog-extentions.game-info.lookup")];
 });
 const tempFolder = () => {
   const folder = mkdtempSync(join(tmpdir(), "board-games-"));

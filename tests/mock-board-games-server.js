@@ -8,6 +8,9 @@
 //   "apidown" -> the XML API search answers 503     "recdown" -> recommend.games answers 503
 //   "cfblock" -> from then on the geekdo endpoints answer a Cloudflare-style 403 page (GET /__reset clears it)
 //   "quota"   -> the XML API and recommend.games answer 429     "zzz" -> every search finds nothing
+// Invented titles that are ALSO video games in the game-info mock (BGG ids 910101...): "moonharvest" (board 2023), "tiebreak"
+// (board 2020), "driftwood" (board 2018). "starfall" (board 2019) is the main fixture game. Searching exactly for one of them
+// returns just that game from the XML API (search and thing) and from recommend.games.
 // MOCK_RG_UNORDERED_DELAY_MS=17000 makes recommend.games answer slowly unless the request asks for an explicit ordering
 // (ordering=-num_votes), like the real service: 15 to 20 s without it, 1 to 2 s with it.
 // MOCK_DELAY_MS=4000 (environment) makes every answer except /__stats and /__reset wait that long first, to try a slow upstream.
@@ -47,6 +50,26 @@ const cloudflare = () =>
 // The fixture's items, so a thing request can be answered for just the ids that were asked for.
 const itemBlocks = thing.match(/<item\b[\s\S]*?<\/item>/g) ?? [];
 
+const extras = {
+  moonharvest: { id: 910101, name: "Moonharvest", year: 2023 },
+  tiebreak: { id: 910102, name: "Tiebreak", year: 2020 },
+  driftwood: { id: 910103, name: "Driftwood", year: 2018 },
+};
+const extraFor = (term) => extras[String(term ?? "").trim().toLowerCase()] ?? null;
+const extraSearch = (game) =>
+  `<?xml version="1.0" encoding="utf-8"?><items total="1" termsofuse="https://boardgamegeek.com/xmlapi/termsofuse"><item type="boardgame" id="${game.id}"><name type="primary" value="${game.name}" /><yearpublished value="${game.year}" /></item></items>`;
+const extraBlock = (game) =>
+  `<item type="boardgame" id="${game.id}"><thumbnail>https://cf.geekdo-images.com/placeholder/img/thumb-${game.id}.jpg</thumbnail><image>https://cf.geekdo-images.com/placeholder/img/full-${game.id}.jpg</image><name type="primary" sortindex="1" value="${game.name}" /><description>An invented board game with the same title as an invented video game. This text is made up for tests.</description><yearpublished value="${game.year}" /><minplayers value="1" /><maxplayers value="4" /><playingtime value="60" /><minplaytime value="30" /><maxplaytime value="60" /><minage value="10" /><link type="boardgamecategory" id="1" value="Farming" /><link type="boardgamemechanic" id="2" value="Set Collection" /><link type="boardgamedesigner" id="3" value="Invented Designer" /><statistics page="1"><ratings><usersrated value="9000" /><average value="7.8" /><bayesaverage value="7.5" /><ranks><rank type="subtype" id="1" name="boardgame" friendlyname="Board Game Rank" value="120" bayesaverage="7.5" /></ranks><averageweight value="2.1" /></ratings></statistics></item>`;
+const extraRecommend = (game) => ({
+  ...recommend.results[0],
+  bgg_id: game.id,
+  name: game.name,
+  alt_name: [],
+  year: game.year,
+  num_votes: 9000,
+  url: `https://boardgamegeek.com/boardgame/${game.id}`,
+});
+
 Bun.serve({
   port,
   async fetch(request) {
@@ -72,12 +95,14 @@ Bun.serve({
         if (query.includes("apidown")) return new Response("Service Unavailable", { status: 503 });
         if (query.includes("quota")) return new Response("slow down", { status: 429, headers: { "retry-after": "120" } });
         if (query.includes("zzz")) return xml('<?xml version="1.0" encoding="utf-8"?><items total="0" termsofuse="https://boardgamegeek.com/xmlapi/termsofuse"></items>');
+        const only = extraFor(query);
+        if (only) return xml(extraSearch(only));
         return xml(search);
       }
       if (url.pathname === "/xmlapi2/thing") {
         stats.bgg.thing += 1;
         const ids = new Set((url.searchParams.get("id") ?? "").split(","));
-        const blocks = itemBlocks.filter((block) => ids.has(/\bid="(\d+)"/.exec(block)?.[1]));
+        const blocks = [...itemBlocks.filter((block) => ids.has(/\bid="(\d+)"/.exec(block)?.[1])), ...Object.values(extras).filter((game) => ids.has(String(game.id))).map(extraBlock)];
         return xml(`<?xml version="1.0" encoding="utf-8"?><items termsofuse="https://boardgamegeek.com/xmlapi/termsofuse">${blocks.join("\n")}</items>`);
       }
     }
@@ -89,6 +114,8 @@ Bun.serve({
       if (term.includes("recdown")) return new Response("Bad gateway", { status: 503 });
       if (term.includes("quota")) return new Response("slow down", { status: 429, headers: { "retry-after": "120" } });
       if (term.includes("zzz")) return Response.json({ count: 0, next: null, previous: null, results: [] });
+      const only = extraFor(term);
+      if (only) return Response.json({ count: 1, next: null, previous: null, results: [extraRecommend(only)] });
       return Response.json(recommend);
     }
 

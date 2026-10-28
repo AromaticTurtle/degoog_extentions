@@ -308,3 +308,29 @@ export const formatExplanation = (query, term, intent, result, source) => {
 };
 
 export const cacheKey = (term) => normalizeTitle(term).slice(0, 120);
+
+// ---- A title that is both a board game and a video game ----------------------------------------------------------
+// The same block is in the board-games and the game-info plugin (each keeps its own copy; a test checks they agree).
+// mode is the game-info setting "whenBothMatch": "oldest" (default), "board-game", "video-game" or "both".
+export const WHEN_BOTH_MODES = ["oldest", "board-game", "video-game", "both"];
+export const DEFAULT_WHEN_BOTH = "oldest";
+export const normalizeWhenBoth = (value) => (WHEN_BOTH_MODES.includes(value) ? value : DEFAULT_WHEN_BOTH);
+
+// A release year: a positive whole number (a number, or a string of digits). Anything else is unknown (0).
+export const validYear = (value) => {
+  const year = typeof value === "number" ? value : typeof value === "string" && /^\s*\d{1,4}\s*$/.test(value) ? Number(value) : Number.NaN;
+  return Number.isInteger(year) && year > 0 && year <= 9999 ? year : 0;
+};
+
+// Which panel shows when both a board game and a video game match: "board", "video" or "both". With "oldest" the
+// earlier release year wins; a tie, an unknown year or an invalid year goes to the BOARD game.
+export const decideBothMatch = (input) => {
+  const { mode, boardYear, videoYear } = input ?? {};
+  const chosen = normalizeWhenBoth(mode);
+  if (chosen === "both") return "both";
+  if (chosen === "board-game") return "board";
+  if (chosen === "video-game") return "video";
+  const board = validYear(boardYear);
+  const video = validYear(videoYear);
+  return board && video && video < board ? "video" : "board";
+};

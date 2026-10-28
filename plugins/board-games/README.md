@@ -66,6 +66,7 @@ same Configure page lets you move it to above or below the sidebar, or above the
 | Use BGG's own website API as a last resort | **off** | Source 3. Opt-in, see the risks. |
 | Only for queries that sound like board games | off | Needs a board game word in the query (saves requests). |
 | Show a short description | on | |
+| How long to wait for the video game answer (seconds, advanced) | 3 | 1 to 8. See "Board game or video game?" (what happens when both match is set in the Game info plugin). |
 | BGG API daily request limit | 300 | Per UTC day, kept in `data/bgg/usage.json`. |
 | recommend.games daily request limit | 500 | Kept in `data/bgg/usage-recommend-games.json`. |
 | BGG website API daily request limit | 100 | Also counts the Wikidata requests it makes. Kept in `data/bgg/usage-geekdo.json`. |
@@ -138,25 +139,51 @@ third-party reports; check the current terms yourself.
   public, do this.
 
 ## Board game or video game?
-Some titles are both. By default **this panel wins over the video game panel** of the Game info plugin: when a board game
-with the same title matches, Game info hides its panel (see its README for the word lists and the setting **Prefer the board
-game panel**, which turns this off). A query with a word that can only mean a video game (`wingspan ps5`, `skyrim
-walkthrough`, `elden ring steam`, `remake`, `rpg`...) never reaches this plugin; a board game word (`wingspan board game`,
-`catan rules`, `tabletop`) always does and keeps the video game panel away. Bare `game`, `guide`, `review`, `wiki`, `trailer`,
-`co-op` and `multiplayer` decide nothing: `wingspan game` is searched as `wingspan`.
+Some titles are both: a board game with a digital version (Wingspan), a video game with a board game adaptation (Stardew
+Valley). When **both** this plugin and the **Game info** plugin match the same title, **the one that came first wins**, by
+release year:
 
-- **The contract:** in `init()` this plugin registers `lookupTitle({ term, deadlineMs, context })` under
-  `globalThis[Symbol.for("degoog-extentions.board-games.lookup")]` (replaced on every init, removed when the module is
-  reloaded, so a disabled plugin is never registered). It answers `{ status: "match", name, id }` for a confident board
-  game, `{ status: "none" }` when a working source found no confident match, and `{ status: "unknown" }` when no source is
-  usable (disabled, no token, paused, over its limit, or **Only for queries that sound like board games** is on, which the
-  plain title does not satisfy), when it was too slow, or on any failure. It uses the same sources, caches, pauses, limits and
-  single-flight as a search, so asking and searching for the same title cost one request together. It never throws, makes
-  no request without a usable source, and waits at most `deadlineMs`; a slower reply keeps running and fills the cache.
-- **A cold first search** that is too slow for the slot (recommend.games needs 1 to 5 s with its vote ordering, see
-  "Performance") gives no board game panel; the lookup then says `unknown`, so the video game shows first. The next search finds the cached board game and only that panel shows.
-- With **Explain matching in the log** on, each question from Game info is one line:
-  `[board-games] "wingspan" asked about by game-info: match "Wingspan"` (or `none`, `unknown`).
+- Wingspan: board game 2019, video game 2020 -> this **board game** panel shows. Likewise Gloomhaven (board 2017, video 2019) and
+  Dune (board 1979, video 1992).
+- Stardew Valley: video game 2016, board game adaptation 2023 -> the **video game** panel shows and this one stays empty.
+- **Tie-breaker:** on the same year, or when either year is unknown or invalid, the **board game** wins.
+- Titles that exist only as a board game (`catan`) or only as a video game (`skyrim`) behave as before.
+
+**The setting is in the Game info plugin** (**When a board game and a video game match the same title**: whichever came
+first (default), always the board game, always the video game, or show both panels). This plugin has no such setting; it is
+told the value whenever it asks Game info, so the two can never disagree. The old Game info toggle "Prefer the board game
+panel" is gone and its default (always the board game) changed. This plugin has one related setting, **How long to wait for
+the video game answer (seconds)** (advanced, default 3, 1 to 8, never past 70 % of the slot time).
+
+- **Explicit words win.** A word that can only mean a video game (`wingspan ps5`, `skyrim walkthrough`, `elden ring steam`,
+  `remake`, `rpg`...) never reaches this plugin; a board game word (`wingspan board game`, `catan rules`, `tabletop`) always does,
+  keeps the video game panel away, and nothing is asked. Bare `game`, `guide`, `review`, `wiki`, `trailer`, `co-op` and
+  `multiplayer` decide nothing: `wingspan game` is searched as `wingspan`. Both plugins keep the same word lists (a test checks
+  they agree).
+- **Without the Game info plugin** (not installed, disabled, no credentials, IGDB paused, or its answer is "unknown" or too
+  slow) the board game shows.
+- **The contract** (two optional functions on `globalThis`, nothing is imported across plugins; neither ever calls the other
+  plugin): in `init()` this plugin registers `lookupTitle({ term, deadlineMs, context })` under
+  `Symbol.for("degoog-extentions.board-games.lookup")` (replaced on every init, removed when the module is reloaded, so a
+  disabled plugin is never registered). It answers `{ status: "match", name, id, year }` (year as an integer, 0 when unknown)
+  for a confident board game, `{ status: "none" }` when a working source found no confident match, and `{ status: "unknown" }`
+  when no source is usable (disabled, no token, paused, over its limit, or **Only for queries that sound like board games** is
+  on, which a plain title does not satisfy), when it was too slow, or on any failure. It uses the same sources, caches, pauses,
+  limits and single-flight as a search, so asking and searching for the same title cost one request together. It never
+  throws, makes no request without a usable source, and waits at most `deadlineMs`; a slower reply keeps running and fills the
+  cache. The mirror function is `Symbol.for("degoog-extentions.game-info.lookup")`.
+- **Order does not matter.** Degoog runs slot plugins one after the other (by `priority`, then folder name, so this plugin first
+  by default). Each plugin asks the other after its own confident pick; both get the same answers from the shared cache, so
+  both orders give the same panels.
+- **A cold first search** that is too slow for the other plugin to wait for (recommend.games needs 1 to 5 s with its vote
+  ordering, see "Performance") makes the plugin that waited show itself; the lookup of a plugin that has already given up on
+  the search says `unknown`. The reply is cached, so later searches are consistent. Remaining limitation: on a very slow cold
+  search both panels can show once.
+- With **Explain matching in the log** on, a both-match decision is one line:
+  `[board-games] "wingspan" both match: board "Wingspan" 2019 vs video "Wingspan" 2020, mode=oldest -> showing board`; the
+  cases where nothing was decided (`board game shown: the game info plugin is not available`, `... video game lookup unknown or
+  too slow`) and each question from Game info (`[board-games] "wingspan" asked about by game-info: match "Wingspan" 2019`) are
+  logged too.
 
 ## How the match is decided
 A game with the right title is shown when it has **enough BGG ratings for how specific your query is**: a long, distinctive title
@@ -226,7 +253,8 @@ the title is instant (see Troubleshooting).
   `test-token`): `DEGOOG_BGG_API_BASE=http://host:4469/xmlapi2`, `DEGOOG_RECOMMEND_GAMES_BASE=http://host:4469/recommend`,
   `DEGOOG_GEEKDO_BASE=http://host:4469/geekdo/api`, `DEGOOG_WIKIDATA_API=http://host:4469/wikidata/w/api.php`. A search term
   containing `apidown` makes the XML API answer 503, `recdown` does the same for recommend.games, and `cfblock` makes the
-  website API answer a Cloudflare-style 403 page. `MOCK_DELAY_MS=5000` in its environment makes every answer wait that long
+  website API answer a Cloudflare-style 403 page. `moonharvest` (board 2023), `tiebreak` (2020) and `driftwood` (2018) are also board games here, to match the invented video
+  games of the game-info mock. `MOCK_DELAY_MS=5000` in its environment makes every answer wait that long
   (to try a slow upstream). `GET /__stats` counts requests per upstream.
 - Layout: `index.js` (settings, gating, the chain), `sources/` (one module per source behind `usable()` and
   `lookup({term, intent, context, deadline, hints})`), `upstream.js` (pause, spacing, budget and status handling shared by

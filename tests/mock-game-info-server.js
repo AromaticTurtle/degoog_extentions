@@ -4,8 +4,12 @@
 //   DEGOOG_PROTONDB_BASE=http://host:4468     DEGOOG_STEAM_BASE=http://host:4468
 // Credentials: client id "test-id", client secret "test-secret", access token "test-token".
 // A search containing "quota" answers 429, "zzz" finds nothing. ProtonDB app 999 answers 404.
-// A search for "starfall" also finds an invented video game of that name (the same title as the board game in the
-// board-games mock), listed first, so both plugins can match the same query.
+// Invented titles that are ALSO board games in the board-games mock, so both plugins can match the same query. A search for
+// one of these terms lists the video game first:
+//   starfall    video 2021, board 2019    (the board game is older)
+//   moonharvest video 2016, board 2023    (the video game is older)
+//   tiebreak    video 2020, board 2020    (a tie)
+//   driftwood   video year unknown, board 2018
 // GET /__stats reports how many requests each upstream served.
 // Usage: bun tests/mock-game-info-server.js [port]
 const port = Number(process.argv[2] || 4468);
@@ -15,12 +19,12 @@ const timeToBeat = await read("igdb-time-to-beat.json");
 const proton = await read("protondb-summary.json");
 const steam = await read("steam-storesearch.json");
 const stats = { token: 0, search: 0, ttb: 0, proton: 0, steam: 0 };
-const starfall = {
-  id: 990001,
-  slug: "starfall-video-game",
-  name: "Starfall",
+const sharedTitle = (id, name, year) => ({
+  id,
+  slug: `${name.toLowerCase()}-video-game`,
+  name,
   summary: "An invented video game with the same title as an invented board game. This text is made up for tests.",
-  first_release_date: 1700000000,
+  ...(year ? { first_release_date: Date.UTC(year, 5, 1) / 1000 } : {}),
   game_type: { id: 0, type: "Main Game" },
   genres: [{ name: "Strategy" }],
   platforms: [{ name: "Nintendo Switch", abbreviation: "Switch" }],
@@ -30,6 +34,12 @@ const starfall = {
   rating_count: 120,
   total_rating: 69,
   total_rating_count: 124,
+});
+const shared = {
+  starfall: sharedTitle(990001, "Starfall", 2021),
+  moonharvest: sharedTitle(990002, "Moonharvest", 2016),
+  tiebreak: sharedTitle(990003, "Tiebreak", 2020),
+  driftwood: sharedTitle(990004, "Driftwood", 0),
 };
 
 Bun.serve({
@@ -57,7 +67,8 @@ Bun.serve({
         stats.search += 1;
         if (body.includes("quota")) return new Response("slow down", { status: 429, headers: { "retry-after": "120" } });
         if (body.includes("zzz")) return Response.json([]);
-        if (/search "[^"]*starfall/i.test(body)) return Response.json([starfall, ...games]);
+        const term = /search "([^"]*)"/i.exec(body)?.[1]?.trim().toLowerCase() ?? "";
+        if (Object.hasOwn(shared, term)) return Response.json([shared[term], ...games]);
         return Response.json(games);
       }
       if (url.pathname === "/v4/game_time_to_beats") {

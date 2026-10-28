@@ -1,6 +1,6 @@
 import { SETTINGS_SCHEMA } from "./settings.js";
 import { sanitizeTerm } from "./request.js";
-import { cacheKey, evaluate, extractTerm, formatExplanation, hasBoardGameWord, isVideoGameQuery, looksLikeATitleSearch } from "./match.js";
+import { cacheKey, decideBothMatch, evaluate, extractTerm, formatExplanation, hasBoardGameWord, isVideoGameQuery, looksLikeATitleSearch, normalizeWhenBoth, validYear } from "./match.js";
 import { buildPanel } from "./render.js";
 import { BggApiSource } from "./sources/bgg-api.js";
 import { RecommendGamesSource } from "./sources/recommend-games.js";
@@ -15,12 +15,28 @@ const TIMED_OUT = Symbol("timed out");
 // board game and a video game, game-info asks this function whether a board game matches and then hides its own panel.
 // Nothing is imported across plugin folders: the function is found under this global symbol (see the README).
 export const LOOKUP_KEY = Symbol.for("degoog-extentions.board-games.lookup");
+// The game-info plugin registers the mirror image of it, so this plugin can ask whether a video game matches too. Neither
+// function ever calls the other plugin, so there is no recursion.
+export const VIDEO_LOOKUP_KEY = Symbol.for("degoog-extentions.game-info.lookup");
+const VIDEO_WAIT_DEFAULT_SECONDS = 3;
+const VIDEO_WAIT_MIN_SECONDS = 1;
+const VIDEO_WAIT_MAX_SECONDS = 8;
+const VIDEO_WAIT_MIN_MS = 200;
 const UNKNOWN = Object.freeze({ status: "unknown" });
 const NONE = Object.freeze({ status: "none" });
 
 // A module that is loaded again (degoog reloads plugins) drops what an earlier copy registered. init() registers the new
 // copy, and only runs when the plugin is enabled, so a disabled plugin never stays registered.
 delete globalThis[LOOKUP_KEY];
+
+// The setting in seconds, clamped to 1..8; anything unreadable is the default.
+export const videoWaitFromSetting = (value) => {
+  const seconds = Number.parseFloat(String(value ?? ""));
+  if (!Number.isFinite(seconds)) return VIDEO_WAIT_DEFAULT_SECONDS * 1000;
+  return Math.round(Math.min(VIDEO_WAIT_MAX_SECONDS, Math.max(VIDEO_WAIT_MIN_SECONDS, seconds)) * 1000);
+};
+
+const clean = (value, max) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
 const truthy = (value, fallback) => (value === undefined || value === "" ? fallback : value === true || value === "true");
 
@@ -71,6 +87,8 @@ export class BoardGamesSlot {
   showDescription = true;
   debugMatching = false;
   disabled = false;
+  videoWaitMs = VIDEO_WAIT_DEFAULT_SECONDS * 1000;
+  videoLookup = () => globalThis[VIDEO_LOOKUP_KEY];
   now = Date.now;
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   spacingMs = MIN_SPACING_MS;
@@ -128,6 +146,7 @@ export class BoardGamesSlot {
     this.debugMatching = truthy(settings.debugMatching, false);
     // degoog passes the stored "disabled" flag along with the settings when the user switches the plugin off.
     this.disabled = truthy(settings.disabled, false);
+    this.videoWaitMs = videoWaitFromSetting(settings.videoGameWaitSeconds);
   }
 
   // Why a query does not get a lookup ("" when it does).
@@ -190,7 +209,7 @@ export class BoardGamesSlot {
 
   _answered(title, outcome) {
     if (this.debugMatching) {
-      const label = outcome.status === "match" ? `match "${outcome.name.replace(/\s+/g, " ").slice(0, 70)}"` : outcome.status;
+      const label = outcome.status === "match" ? `match "${outcome.name.replace(/\s+/g, " ").slice(0, 70)}" ${outcome.year || "(year unknown)"}` : outcome.status;
       console.info(`[board-games] "${title.replace(/\s+/g, " ").slice(0, 100)}" asked about by game-info: ${label}`);
     }
     return outcome;
@@ -222,7 +241,7 @@ export class BoardGamesSlot {
       }
       let outcome = UNKNOWN;
       if (found === TIMED_OUT) work.catch(() => {});
-      else if (found.game) outcome = { status: "match", name: String(found.game.name ?? ""), id: String(found.game.id ?? "") };
+      else if (found.game) outcome = { status: "match", name: String(found.game.name ?? ""), id: String(found.game.id ?? ""), year: validYear(found.game.year) };
       else if (found.answered) outcome = NONE;
       return this._answered(title, outcome);
     } catch {
@@ -230,7 +249,48 @@ export class BoardGamesSlot {
     }
   }
 
+  // Does a video game with the same title match, and does it win? The answer carries game-info's setting (the single
+  // source of truth for what happens when both match). Only asked after this plugin has a confident pick, never for a
+  // query with a board game word (game-info does not trigger for it), and never longer than the time left. Anything but a
+  // clear "match" (absent plugin, none, unknown, too slow) keeps the board game.
+  async _videoGameWins(query, term, context, startedAt, game) {
+    const say = (text) => this.debugMatching && console.info(`[board-games] "${clean(term, 100)}" ${text}`);
+    if (hasBoardGameWord(query)) return false;
+    const lookup = this.videoLookup();
+    if (typeof lookup !== "function") {
+      say("board game shown: the game info plugin is not available");
+      return false;
+    }
+    const waitMs = Math.min(this.videoWaitMs, startedAt + this.startWindowMs - this.now());
+    let outcome = { status: "unknown" };
+    if (waitMs >= VIDEO_WAIT_MIN_MS) {
+      let timer;
+      const late = new Promise((resolve) => {
+        timer = setTimeout(() => resolve(null), waitMs + 100);
+      });
+      try {
+        const answer = await Promise.race([Promise.resolve(lookup({ term, deadlineMs: waitMs, context })), late]);
+        if (answer && typeof answer === "object") outcome = answer;
+      } catch {
+        /* the board game stays */
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    if (outcome.status !== "match") {
+      say(`board game shown: video game lookup ${outcome.status === "none" ? "none" : "unknown or too slow"}`);
+      return false;
+    }
+    const mode = normalizeWhenBoth(outcome.mode);
+    const boardYear = validYear(game.year);
+    const videoYear = validYear(outcome.year);
+    const shows = decideBothMatch({ mode, boardYear, videoYear });
+    say(`both match: board "${clean(game.name, 70)}" ${boardYear || "(year unknown)"} vs video "${clean(outcome.name, 70)}" ${videoYear || "(year unknown)"}, mode=${mode} -> showing ${shows}`);
+    return shows === "video";
+  }
+
   async execute(query, context) {
+    const startedAt = this.now();
     if (!this.trigger(query)) return EMPTY;
     const term = extractTerm(query);
     if (sanitizeTerm(term).length < 2) return EMPTY;
@@ -261,6 +321,7 @@ export class BoardGamesSlot {
       }
       const game = found.game;
       if (!game) return EMPTY;
+      if (await this._videoGameWins(query, term, context, startedAt, game)) return EMPTY;
       const html = buildPanel({
         game,
         signProxy: context?.signProxyUrl ?? this._signProxy,

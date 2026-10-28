@@ -25,7 +25,7 @@ import {
 import { attributionHtml, buildPanel } from "../plugins/board-games/render.js";
 import { SETTINGS_SCHEMA } from "../plugins/board-games/settings.js";
 import { BARS, evaluate, formatExplanation, judge, pickGame, scoreGame, specificity, stripDecorations, titleSimilarity } from "../plugins/board-games/match.js";
-import { BoardGamesSlot, LOOKUP_KEY } from "../plugins/board-games/index.js";
+import { BoardGamesSlot, LOOKUP_KEY, VIDEO_LOOKUP_KEY, videoWaitFromSetting } from "../plugins/board-games/index.js";
 import { DEFAULT_RECOMMEND_BASE, recommendSearchUrl } from "../plugins/board-games/sources/recommend-games.js";
 import { DEFAULT_GEEKDO_BASE, dynamicInfoUrl, geekitemsUrl } from "../plugins/board-games/sources/bgg-internal.js";
 import {
@@ -52,6 +52,9 @@ const TOKEN = "test-bgg-token-5d7e1b9c2a";
 const folders = [];
 afterEach(() => {
   while (folders.length) rmSync(folders.pop(), { recursive: true, force: true });
+  // the two plugins register lookup functions on globalThis in init(); one test must not see another's
+  delete globalThis[Symbol.for("degoog-extentions.board-games.lookup")];
+  delete globalThis[Symbol.for("degoog-extentions.game-info.lookup")];
 });
 const tempFolder = () => {
   const folder = mkdtempSync(join(tmpdir(), "board-games-sources-"));
@@ -1539,11 +1542,13 @@ describe("explaining decisions (debugMatching)", () => {
     expect(await capture(() => quiet.execute("skyreach", makeContext({ recommend: SKYREACH_REPLY })))).toEqual([]);
     const loud = make({ debugMatching: "true" });
     const lines = await capture(() => loud.execute("starfall", makeContext()));
-    expect(lines).toHaveLength(1);
+    // the explain block, then one line saying that no game info plugin is there
+    expect(lines).toHaveLength(2);
     expect(lines[0]).toStartWith('[board-games] "starfall" term="starfall"');
     expect(lines[0]).toContain("source=bgg-api");
     expect(lines[0]).toContain("=> panel:");
-    for (const bad of [TOKEN, "http", "Bearer"]) expect(lines[0]).not.toContain(bad);
+    expect(lines[1]).toBe('[board-games] "starfall" board game shown: the game info plugin is not available');
+    for (const bad of [TOKEN, "http", "Bearer"]) for (const line of lines) expect(line).not.toContain(bad);
   });
 
   test("a title-like query that the gating rejects gets one line naming the rule, only in debug mode", async () => {
@@ -1594,7 +1599,7 @@ describe("the lookup contract (lookupTitle)", () => {
 
   test("match, none and unknown", async () => {
     const slot = make();
-    expect(await ask(slot, "starfall", makeContext())).toEqual({ status: "match", name: "Starfall", id: "900001" });
+    expect(await ask(slot, "starfall", makeContext())).toEqual({ status: "match", name: "Starfall", id: "900001", year: 2019 });
     expect(await ask(make(), "zzz nothing here", makeContext())).toEqual({ status: "none" });
     // a working source that finds no confident match is final: nothing else is asked
     const context = makeContext();
@@ -1624,7 +1629,7 @@ describe("the lookup contract (lookupTitle)", () => {
     const broken = makeContext({ respond: (kind) => (kind === "bgg-search" || kind === "rg" ? html5xx() : undefined) });
     await capture(async () => {
       // recommend.games takes over, exactly as for execute()
-      expect(await ask(make(), "starfall", context)).toEqual({ status: "match", name: "Starfall", id: "900001" });
+      expect(await ask(make(), "starfall", context)).toEqual({ status: "match", name: "Starfall", id: "900001", year: 2019 });
       expect(await ask(make(), "starfall", broken)).toEqual({ status: "unknown" });
     });
   });
@@ -1718,7 +1723,8 @@ describe("the lookup contract (lookupTitle)", () => {
 
   test("the answers are frozen values and carry no urls or secrets", async () => {
     const outcome = await ask(make(), "starfall", makeContext());
-    expect(Object.keys(outcome).sort()).toEqual(["id", "name", "status"]);
+    expect(Object.keys(outcome).sort()).toEqual(["id", "name", "status", "year"]);
+    expect(Number.isInteger(outcome.year)).toBe(true);
     expect(JSON.stringify(outcome)).not.toContain("http");
     expect(JSON.stringify(outcome)).not.toContain(TOKEN);
     expect(Object.isFrozen(await ask(make(), "zzz nothing here", makeContext()))).toBe(true);
@@ -1731,8 +1737,8 @@ describe("the lookup contract (lookupTitle)", () => {
       await ask(loud, "starfall", makeContext());
     });
     expect(lines.filter((line) => line.includes("asked about by game-info"))).toEqual([
-      '[board-games] "starfall" asked about by game-info: match "Starfall"',
-      '[board-games] "starfall" asked about by game-info: match "Starfall"',
+      '[board-games] "starfall" asked about by game-info: match "Starfall" 2019',
+      '[board-games] "starfall" asked about by game-info: match "Starfall" 2019',
     ]);
     for (const line of lines) {
       expect(line).not.toContain(TOKEN);
@@ -1777,5 +1783,210 @@ describe("the recommend.games request is the fast one", () => {
     });
     // 60 votes: "skyreach" is a medium query (exact bar 100), halved for a first result = 50, so it shows
     expect((await make({ enableApi: "false" }).execute("skyreach", makeContext({ recommend: reply }))).title).toBe("Skyreach");
+  });
+});
+
+// ---- When both match: whichever came first, seen from board-games ----
+
+describe("the year in the lookup answer, from each source", () => {
+  const ask = (slot, term, context) => slot.lookupTitle({ term, deadlineMs: 2500, context });
+
+  test("BGG XML API", async () => {
+    expect(await ask(make({ enableRecommendGames: "false" }), "starfall", makeContext())).toMatchObject({ status: "match", year: 2019 });
+  });
+
+  test("recommend.games", async () => {
+    expect(await ask(make({ enableApi: "false" }), "starfall", makeContext())).toMatchObject({ status: "match", year: 2019 });
+    const reply = JSON.stringify({ results: [rgResult(910001, "Skyreach", 115_000, { year: 2020 })] });
+    expect(await ask(make({ enableApi: "false" }), "skyreach", makeContext({ recommend: reply }))).toMatchObject({ status: "match", year: 2020 });
+  });
+
+  test("BGG website API (with Wikidata)", async () => {
+    expect(await ask(make({ enableApi: "false", enableRecommendGames: "false", enableBggInternal: "true" }), "starfall", makeContext())).toMatchObject({ status: "match", year: 2019 });
+  });
+
+  test("the year is an integer, 0 when the source has none or garbage", async () => {
+    for (const year of [null, undefined, "", "soon", -5, 0]) {
+      const reply = JSON.stringify({ results: [rgResult(910001, "Skyreach", 115_000, { year })] });
+      const outcome = await ask(make({ enableApi: "false" }), "skyreach", makeContext({ recommend: reply }));
+      expect(outcome.status).toBe("match");
+      expect(outcome.year).toBe(0);
+    }
+    const asString = JSON.stringify({ results: [rgResult(910001, "Skyreach", 115_000, { year: "1995" })] });
+    expect((await ask(make({ enableApi: "false" }), "skyreach", makeContext({ recommend: asString }))).year).toBe(1995);
+  });
+});
+
+describe("whichever came first, seen from board-games", () => {
+  const video = (answer) => {
+    const calls = [];
+    return { calls, lookup: async (request) => { calls.push(request); return typeof answer === "function" ? answer(request) : answer; } };
+  };
+  const run = async (query, answer, settings = {}) => {
+    const fake = video(answer);
+    const slot = make(settings);
+    slot.videoLookup = () => fake.lookup;
+    const out = await slot.execute(query, makeContext());
+    return { out, calls: fake.calls, shown: Boolean(out.html) };
+  };
+  // the board game "Starfall" is from 2019
+  const match = (year, extra = {}) => ({ status: "match", name: "Starfall (video game)", id: "990001", year, mode: "oldest", ...extra });
+
+  test("the symbol is the documented one and the default lookup reads the global", async () => {
+    expect(VIDEO_LOOKUP_KEY).toBe(Symbol.for("degoog-extentions.game-info.lookup"));
+    const slot = make();
+    expect(slot.videoLookup()).toBeUndefined();
+    const lookup = async () => ({ status: "none" });
+    globalThis[VIDEO_LOOKUP_KEY] = lookup;
+    try {
+      expect(slot.videoLookup()).toBe(lookup);
+    } finally {
+      delete globalThis[VIDEO_LOOKUP_KEY];
+    }
+  });
+
+  test("a video game released before the board game (2019) hides the board game", async () => {
+    const { shown, calls } = await run("starfall", match(2016));
+    expect(shown).toBe(false);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].term).toBe("starfall");
+    expect((await run("starfall", match(2018))).shown).toBe(false);
+  });
+
+  test("a video game released after the board game leaves the board game", async () => {
+    expect((await run("starfall", match(2021))).shown).toBe(true);
+  });
+
+  test("a tie, an unknown or an invalid year goes to the board game", async () => {
+    for (const year of [2019, 0, undefined, null, "", "soon", -3, NaN]) expect((await run("starfall", match(year))).shown).toBe(true);
+  });
+
+  test("the mode is game-info's, carried in the answer: board-game and both show the board game, video-game hides it", async () => {
+    expect((await run("starfall", match(2000, { mode: "board-game" }))).shown).toBe(true);
+    expect((await run("starfall", match(2000, { mode: "both" }))).shown).toBe(true);
+    expect((await run("starfall", match(2030, { mode: "video-game" }))).shown).toBe(false);
+    // no local setting changes it
+    expect((await run("starfall", match(2030, { mode: "video-game" }), { whenBothMatch: "board-game", preferBoardGames: "true" })).shown).toBe(false);
+    // a missing or unknown mode is the default rule
+    expect((await run("starfall", match(2000, { mode: undefined }))).shown).toBe(false);
+    expect((await run("starfall", match(2000, { mode: "nonsense" }))).shown).toBe(false);
+    expect((await run("starfall", match(2030, { mode: "nonsense" }))).shown).toBe(true);
+  });
+
+  test("none, unknown, anything odd, a throw, a hang and an absent plugin show the board game", async () => {
+    for (const answer of [{ status: "none" }, { status: "unknown" }, undefined, null, "match", 5, {}]) expect((await run("starfall", answer)).shown).toBe(true);
+    const throwing = make();
+    throwing.videoLookup = () => async () => { throw new Error("boom"); };
+    expect((await throwing.execute("starfall", makeContext())).title).toBe("Starfall");
+    const hanging = make();
+    hanging.videoLookup = () => () => new Promise(() => {});
+    hanging.startWindowMs = 600;
+    const started = Date.now();
+    expect((await hanging.execute("starfall", makeContext())).title).toBe("Starfall");
+    expect(Date.now() - started).toBeLessThan(1500);
+    expect((await make().execute("starfall", makeContext())).title).toBe("Starfall");
+  });
+
+  test("a board game word means game-info does not trigger: nothing is asked; a video word means this plugin does not trigger", async () => {
+    for (const query of ["starfall board game", "starfall rules", "starfall tabletop", "starfall bgg", "starfall expansion"]) {
+      const result = await run(query, match(1990));
+      expect(result.shown).toBe(true);
+      expect(result.calls).toHaveLength(0);
+    }
+    for (const query of ["starfall ps5", "starfall steam", "starfall walkthrough"]) {
+      const result = await run(query, match(1990));
+      expect(result.shown).toBe(false);
+      expect(result.calls).toHaveLength(0);
+    }
+  });
+
+  test("an ambiguous word is dropped from the term that is sent", async () => {
+    const { calls } = await run("starfall game", { status: "none" });
+    expect(calls[0].term).toBe("starfall");
+  });
+
+  test("the wait: videoGameWaitSeconds clamped to 1..8, 3 by default, capped by what is left of 70 % of the slot timeout", async () => {
+    expect(videoWaitFromSetting("3")).toBe(3000);
+    expect(videoWaitFromSetting(undefined)).toBe(3000);
+    expect(videoWaitFromSetting("0")).toBe(1000);
+    expect(videoWaitFromSetting("-4")).toBe(1000);
+    expect(videoWaitFromSetting("0.3")).toBe(1000);
+    expect(videoWaitFromSetting("2.5")).toBe(2500);
+    expect(videoWaitFromSetting("8")).toBe(8000);
+    expect(videoWaitFromSetting("99")).toBe(8000);
+    for (const bad of ["", "soon", null, NaN, Infinity, {}]) expect(videoWaitFromSetting(bad)).toBe(3000);
+    expect(make().videoWaitMs).toBe(3000);
+    const field = SETTINGS_SCHEMA.find((entry) => entry.key === "videoGameWaitSeconds");
+    expect(field).toMatchObject({ type: "number", default: "3", advanced: true });
+    expect(field.required).toBeUndefined();
+    expect(SETTINGS_SCHEMA.some((entry) => entry.key === "whenBothMatch")).toBe(false); // game-info is the one place for it
+
+    const wait = async (settings, startWindowMs = 8000) => {
+      const fake = video({ status: "none" });
+      const slot = make(settings);
+      slot.startWindowMs = startWindowMs;
+      slot.videoLookup = () => fake.lookup;
+      await slot.execute("starfall", makeContext());
+      return fake.calls[0]?.deadlineMs;
+    };
+    expect(await wait({})).toBeLessThanOrEqual(3000);
+    expect(await wait({})).toBeGreaterThan(2500);
+    expect(await wait({ videoGameWaitSeconds: "6" })).toBeLessThanOrEqual(6000);
+    expect(await wait({ videoGameWaitSeconds: "6" })).toBeGreaterThan(5500);
+    expect(await wait({ videoGameWaitSeconds: "1" })).toBeLessThanOrEqual(1000);
+    expect(await wait({ videoGameWaitSeconds: "99" })).toBeLessThanOrEqual(8000);
+    expect(await wait({ videoGameWaitSeconds: "6" }, 1500)).toBeLessThanOrEqual(1500); // the slot budget is the limit
+  });
+
+  test("when almost nothing of the slot time is left the video game is not asked", async () => {
+    const fake = video(match(1990));
+    const slot = make();
+    slot.videoLookup = () => fake.lookup;
+    let ticks = 0;
+    slot.now = () => 1_000_000 + (ticks += 4000); // every reading is 4 s later than the previous one
+    const out = await slot.execute("starfall", makeContext());
+    expect(fake.calls).toHaveLength(0);
+    // the pipeline itself ran out of time too, so there may be no panel: either way no question was asked
+    expect(["Starfall", ""]).toContain(out.title);
+  });
+
+  test("this plugin's own lookup never calls the video game lookup: no recursion", async () => {
+    const fake = video(match(1990));
+    const slot = make();
+    slot.videoLookup = () => fake.lookup;
+    for (const term of ["starfall", "zzz nothing"]) await slot.lookupTitle({ term, deadlineMs: 1000, context: makeContext() });
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  test("debug lines: both match, and why the board game stayed; no secrets", async () => {
+    const lines = await capture(() => run("starfall", match(2016), { debugMatching: "true" }));
+    expect(lines.filter((line) => line.includes("both match"))).toEqual(['[board-games] "starfall" both match: board "Starfall" 2019 vs video "Starfall (video game)" 2016, mode=oldest -> showing video']);
+    const board = await capture(() => run("starfall", match(2021), { debugMatching: "true" }));
+    expect(board.some((line) => line.endsWith("-> showing board"))).toBe(true);
+    const both = await capture(() => run("starfall", match(2016, { mode: "both" }), { debugMatching: "true" }));
+    expect(both.some((line) => line.includes("mode=both -> showing both"))).toBe(true);
+    const unknown = await capture(() => run("starfall", { status: "unknown" }, { debugMatching: "true" }));
+    expect(unknown).toContain('[board-games] "starfall" board game shown: video game lookup unknown or too slow');
+    const hostile = await capture(() => run("starfall", match(2016, { name: `Bad\n[injected] ${"x".repeat(300)}` }), { debugMatching: "true" }));
+    const line = hostile.find((entry) => entry.includes("both match"));
+    expect(line.includes("\n")).toBe(false);
+    expect(line.length).toBeLessThan(300);
+    for (const entry of [...lines, ...board, ...both, ...unknown, ...hostile]) for (const bad of [TOKEN, "http", "Bearer"]) expect(entry).not.toContain(bad);
+    expect(await capture(() => run("starfall", match(2016)))).toEqual([]);
+  });
+
+  test("a hidden board game is still cached, so a later search costs no request", async () => {
+    const fake = video(match(2016));
+    const slot = make();
+    slot.videoLookup = () => fake.lookup;
+    const context = makeContext();
+    expect(await slot.execute("starfall", context)).toEqual(EMPTY);
+    const used = context.calls.length;
+    expect(await slot.execute("starfall", context)).toEqual(EMPTY);
+    expect(context.calls).toHaveLength(used);
+    fake.lookup = async () => ({ status: "none" });
+    slot.videoLookup = () => fake.lookup;
+    expect((await slot.execute("starfall", context)).title).toBe("Starfall");
+    expect(context.calls).toHaveLength(used);
   });
 });

@@ -55,6 +55,17 @@ export const SETTINGS_SCHEMA = [
     description: "Shows the first few sentences of the game's description under the title.",
   },
   {
+    key: "videoGameWaitSeconds",
+    fieldset: "Display",
+    advanced: true,
+    label: "How long to wait for the video game answer (seconds)",
+    type: "number",
+    default: "3",
+    placeholder: "3",
+    description:
+      "When a board game matches, this plugin asks the Game info plugin whether a video game with the same title matches, and waits at most this long (1 to 8 seconds, and never past 70 % of degoog's slot time). What happens when both match is set in the Game info plugin (setting 'When a board game and a video game match the same title', default: whichever came first); this plugin follows it. On a slow answer or without the Game info plugin the board game shows.",
+  },
+  {
     key: "dailyRequestLimit",
     fieldset: "Limits",
     advanced: true,

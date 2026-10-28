@@ -16,15 +16,15 @@
       "path": "plugins/board-games",
       "name": "Board games (BoardGameGeek)",
       "description": "Board game panel in the side column from BoardGameGeek data: rating, rank, weight, players, playing time, designers, mechanics. Three optional sources with an automatic fallback: the BGG XML API (token, registration required), recommend.games (no key) and BGG's own website API (opt-in, off by default). Cached and capped by per-source daily limits.",
-      "version": "1.2.1",
+      "version": "1.3.0",
       "type": "slot",
       "minDegoogVersion": "1.1.0"
     },
     {
       "path": "plugins/game-info",
       "name": "Game info (IGDB + ProtonDB)",
-      "description": "Video game panel in the side column: IGDB scores, platforms, developer, time to beat, ProtonDB Linux compatibility and a Steam link. Needs free Twitch/IGDB credentials. Cached. Hides itself when a board game with the same title matches (can be turned off).",
-      "version": "1.2.0",
+      "description": "Video game panel in the side column: IGDB scores, platforms, developer, time to beat, ProtonDB Linux compatibility and a Steam link. Needs free Twitch/IGDB credentials. Cached. When a title is also a board game, shows whichever came first (configurable).",
+      "version": "1.3.0",
       "type": "slot",
       "minDegoogVersion": "1.1.0"
     }
