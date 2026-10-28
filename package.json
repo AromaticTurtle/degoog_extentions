@@ -27,6 +27,14 @@
       "version": "1.3.0",
       "type": "slot",
       "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "plugins/reddit-lens",
+      "name": "Reddit lens",
+      "description": "Turns 'best homelab os reddit', 'reddit best homelab os', '!reddit ...' and 'r/homelab ...' into a site:reddit.com search, so your normal web engines return Reddit pages with their own titles, snippets and dates. Makes no request itself.",
+      "version": "1.0.0",
+      "type": "interceptor",
+      "minDegoogVersion": "1.1.0"
     }
   ],
   "engines": [
@@ -41,6 +49,13 @@
       "path": "engines/mojeek",
       "name": "Mojeek",
       "description": "Mojeek web search without an API key. Passes Mojeek's small proof-of-work check once a month, then each search is one request. Bounded, paused after blocks.",
+      "version": "1.0.0",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "engines/reddit-search",
+      "name": "Reddit Search",
+      "description": "Reddit posts from Reddit's public Atom search feed with relevance sort, subreddit, date, a real excerpt and a thumbnail, instead of the official engine's thin results. One request per page, cached, paused (never bypassed) when Reddit refuses.",
       "version": "1.0.0",
       "minDegoogVersion": "1.1.0"
     },

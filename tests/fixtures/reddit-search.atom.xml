@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- HAND-WRITTEN test data in the layout of Reddit's public Atom search feed. Invented posts, authors, subreddits and ids: not a real recording. -->
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+  <category term="best homelab os" label="search results - best homelab os"/>
+  <updated>2026-10-28T10:00:00+00:00</updated>
+  <icon>https://www.redditstatic.com/icon.png/</icon>
+  <id>/search.rss?q=best+homelab+os</id>
+  <link rel="self" href="https://www.reddit.com/search.rss?q=best+homelab+os" type="application/atom+xml"/>
+  <link rel="alternate" href="https://www.reddit.com/search?q=best+homelab+os" type="text/html"/>
+  <title>search results - best homelab os</title>
+  <entry>
+    <category term="homelabos" label="r/homelabos"/>
+    <content type="html">&lt;table&gt; &lt;tr&gt;&lt;td&gt; &lt;!-- SC_OFF --&gt;&lt;div class="md"&gt;&lt;p&gt;A community about a made-up homelab operating system.&lt;/p&gt;&lt;/div&gt;&lt;!-- SC_ON --&gt; &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</content>
+    <id>t5_2xyz9</id>
+    <link href="https://www.reddit.com/r/homelabos/"/>
+    <updated>2018-06-14T14:32:16+00:00</updated>
+    <title>r/homelabos</title>
+  </entry>
+  <entry>
+    <content type="html">&lt;p&gt;an invented user&lt;/p&gt;</content>
+    <id>t2_7ab12</id>
+    <link href="https://www.reddit.com/user/someone/"/>
+    <updated>2019-01-01T00:00:00+00:00</updated>
+    <title>u/someone</title>
+  </entry>
+  <entry>
+    <author><name>/u/quietfrog</name><uri>https://www.reddit.com/user/quietfrog</uri></author>
+    <category term="homelab" label="r/homelab"/>
+    <content type="html">&lt;table&gt; &lt;tr&gt;&lt;td&gt; &lt;/td&gt;&lt;td&gt; &lt;!-- SC_OFF --&gt;&lt;div class=&quot;md&quot;&gt;&lt;p&gt;I&amp;#39;m setting up a small box (4 cores, 16 GB) for files, a media server &amp;amp; a few containers. Is Debian with Docker enough, or should I look at a hypervisor first? I don&amp;#39;t need clustering.&lt;/p&gt;
+
+&lt;p&gt;Budget is tiny, and I would like something I can leave alone for months. Any pitfalls with updates? Thanks in advance for the advice!&lt;/p&gt;&lt;/div&gt;&lt;!-- SC_ON --&gt; &amp;#32; submitted by &amp;#32; &lt;a href=&quot;https://www.reddit.com/user/quietfrog&quot;&gt; /u/quietfrog &lt;/a&gt; &lt;br/&gt; &lt;span&gt;&lt;a href=&quot;https://www.reddit.com/r/homelab/comments/1abcd01/which_os_for_a_tiny_home_server_box/&quot;&gt;[link]&lt;/a&gt;&lt;/span&gt; &amp;#32; &lt;span&gt;&lt;a href=&quot;https://www.reddit.com/r/homelab/comments/1abcd01/which_os_for_a_tiny_home_server_box/&quot;&gt;[comments]&lt;/a&gt;&lt;/span&gt; &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</content>
+    <id>t3_1abcd01</id>
+    <link href="https://www.reddit.com/r/homelab/comments/1abcd01/which_os_for_a_tiny_home_server_box/"/>
+    <updated>2024-06-22T08:10:20+00:00</updated>
+    <published>2024-06-22T08:10:20+00:00</published>
+    <title>Which OS for a tiny home server box?</title>
+  </entry>
+  <entry>
+    <author><name>/u/bluepine</name><uri>https://www.reddit.com/user/bluepine</uri></author>
+    <category term="selfhosted" label="r/selfhosted"/>
+    <content type="html">&lt;table&gt; &lt;tr&gt;&lt;td&gt; &lt;/td&gt;&lt;td&gt;  &amp;#32; submitted by &amp;#32; &lt;a href=&quot;https://www.reddit.com/user/bluepine&quot;&gt; /u/bluepine &lt;/a&gt; &lt;br/&gt; &lt;span&gt;&lt;a href=&quot;https://www.example.org/blog/five-node-cluster?utm_source=reddit&quot;&gt;[link]&lt;/a&gt;&lt;/span&gt; &amp;#32; &lt;span&gt;&lt;a href=&quot;https://www.reddit.com/r/selfhosted/comments/1abcd02/weekend_writeup_my_fivenode_cluster/&quot;&gt;[comments]&lt;/a&gt;&lt;/span&gt; &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</content>
+    <id>t3_1abcd02</id>
+    <link href="https://www.reddit.com/r/selfhosted/comments/1abcd02/weekend_writeup_my_fivenode_cluster/"/>
+    <updated>2024-07-02T19:45:00+00:00</updated>
+    <published>2024-07-02T19:45:00+00:00</published>
+    <title>Weekend write-up: my five-node cluster</title>
+  </entry>
+  <entry>
+    <author><name>/u/ghosted</name><uri>https://www.reddit.com/user/ghosted</uri></author>
+    <category term="linux4noobs" label="r/linux4noobs"/>
+    <content type="html">&lt;table&gt; &lt;tr&gt;&lt;td&gt; &lt;/td&gt;&lt;td&gt; &lt;!-- SC_OFF --&gt;&lt;div class=&quot;md&quot;&gt;&lt;p&gt;[removed]&lt;/p&gt;&lt;/div&gt;&lt;!-- SC_ON --&gt; &amp;#32; submitted by &amp;#32; &lt;a href=&quot;https://www.reddit.com/user/ghosted&quot;&gt; /u/ghosted &lt;/a&gt; &lt;br/&gt; &lt;span&gt;&lt;a href=&quot;https://www.reddit.com/r/linux4noobs/comments/1abcd03/best_distro_for_old_hardware/&quot;&gt;[link]&lt;/a&gt;&lt;/span&gt; &amp;#32; &lt;span&gt;&lt;a href=&quot;https://www.reddit.com/r/linux4noobs/comments/1abcd03/best_distro_for_old_hardware/&quot;&gt;[comments]&lt;/a&gt;&lt;/span&gt; &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</content>
+    <id>t3_1abcd03</id>
+    <link href="https://www.reddit.com/r/linux4noobs/comments/1abcd03/best_distro_for_old_hardware/"/>
+    <updated>2023-11-05T07:00:00+00:00</updated>
+    <published>2023-11-05T07:00:00+00:00</published>
+    <title>Best distro for old hardware?</title>
+  </entry>
+  <entry>
+    <author><name>/u/adultperson</name><uri>https://www.reddit.com/user/adultperson</uri></author>
+    <category term="testnsfw" label="r/testnsfw"/>
+    <content type="html">&lt;table&gt; &lt;tr&gt;&lt;td&gt; &lt;/td&gt;&lt;td&gt; &lt;!-- SC_OFF --&gt;&lt;div class=&quot;md&quot;&gt;&lt;p&gt;Invented text for the NSFW test.&lt;/p&gt;&lt;/div&gt;&lt;!-- SC_ON --&gt; &amp;#32; submitted by &amp;#32; &lt;a href=&quot;https://www.reddit.com/user/adultperson&quot;&gt; /u/adultperson &lt;/a&gt; &lt;br/&gt; &lt;span&gt;&lt;a href=&quot;https://www.reddit.com/r/testnsfw/comments/1abcd04/an_invented_adult_post/&quot;&gt;[link]&lt;/a&gt;&lt;/span&gt; &amp;#32; &lt;span&gt;&lt;a href=&quot;https://www.reddit.com/r/testnsfw/comments/1abcd04/an_invented_adult_post/&quot;&gt;[comments]&lt;/a&gt;&lt;/span&gt; &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</content>
+    <id>t3_1abcd04</id>
+    <link href="https://www.reddit.com/r/testnsfw/comments/1abcd04/an_invented_adult_post/"/>
+    <updated>2024-03-03T03:03:03+00:00</updated>
+    <published>2024-03-03T03:03:03+00:00</published>
+    <title>[NSFW] An invented adult post</title>
+  </entry>
+  <entry>
+    <author><name>/u/rackfan</name><uri>https://www.reddit.com/user/rackfan</uri></author>
+    <category term="homelabsetups" label="r/homelabsetups"/>
+    <content type="html">&lt;table&gt; &lt;tr&gt;&lt;td&gt; &lt;a href=&quot;https://www.reddit.com/r/homelabsetups/comments/1abcd05/my_tiny_rack_after_a_year/&quot;&gt; &lt;img src=&quot;https://external-preview.redd.it/abcd05.jpg?width=640&amp;crop=smart&amp;auto=webp&amp;s=0123456789abcdef&quot; alt=&quot;thumbnail&quot; title=&quot;thumbnail&quot; /&gt; &lt;/a&gt; &lt;/td&gt;&lt;td&gt;  &amp;#32; submitted by &amp;#32; &lt;a href=&quot;https://www.reddit.com/user/rackfan&quot;&gt; /u/rackfan &lt;/a&gt; &lt;br/&gt; &lt;span&gt;&lt;a href=&quot;https://i.redd.it/abcd05photo.jpeg&quot;&gt;[link]&lt;/a&gt;&lt;/span&gt; &amp;#32; &lt;span&gt;&lt;a href=&quot;https://www.reddit.com/r/homelabsetups/comments/1abcd05/my_tiny_rack_after_a_year/&quot;&gt;[comments]&lt;/a&gt;&lt;/span&gt; &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</content>
+    <id>t3_1abcd05</id>
+    <link href="https://www.reddit.com/r/homelabsetups/comments/1abcd05/my_tiny_rack_after_a_year/"/>
+    <media:thumbnail url="https://b.thumbs.redditmedia.com/abcd05thumb.jpg"/>
+    <updated>2025-01-15T12:00:00+00:00</updated>
+    <published>2025-01-15T12:00:00+00:00</published>
+    <title>My tiny rack after a year</title>
+  </entry>
+  <entry>
+    <author><name>/u/cdatauser</name><uri>https://www.reddit.com/user/cdatauser</uri></author>
+    <category term="selfhosted" label="r/selfhosted"/>
+    <content type="html"><![CDATA[<table> <tr><td> </td><td> <!-- SC_OFF --><div class="md"><p>Short answer first: probably not. Longer answer: it depends on backups, noise and power. <a href="https://example.org/nas">https://example.org/nas</a></p></div><!-- SC_ON --> &#32; submitted by &#32; <a href="https://www.reddit.com/user/cdatauser"> /u/cdatauser </a> <br/> <span><a href="https://www.reddit.com/r/selfhosted/comments/1abcd06/is_a_nas_box_overkill_for_two_users/">[link]</a></span> &#32; <span><a href="https://old.reddit.com/r/selfhosted/comments/1abcd06/is_a_nas_box_overkill_for_two_users/?utm_source=share&utm_medium=web2x&context=3">[comments]</a></span> </td></tr></table>]]></content>
+    <id>t3_1abcd06</id>
+    <link href="https://old.reddit.com/r/selfhosted/comments/1abcd06/is_a_nas_box_overkill_for_two_users/?utm_source=share&utm_medium=web2x&context=3"/>
+    <updated>2024-09-09T09:09:09+00:00</updated>
+    <published>2024-09-09T09:09:09+00:00</published>
+    <title>Is a NAS box overkill for two users?</title>
+  </entry>
+  <entry>
+    <category term="linux" label="r/linux"/>
+    <content type="html">&lt;table&gt; &lt;tr&gt;&lt;td&gt; &lt;/td&gt;&lt;td&gt; &lt;!-- SC_OFF --&gt;&lt;div class=&quot;md&quot;&gt;&lt;p&gt;&lt;a href=&quot;https://example.net/article&quot;&gt;https://example.net/article&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;&lt;!-- SC_ON --&gt; &amp;#32; submitted by &amp;#32; &lt;a href=&quot;https://www.reddit.com/user/unknown&quot;&gt; /u/unknown &lt;/a&gt; &lt;br/&gt; &lt;span&gt;&lt;a href=&quot;https://example.net/article&quot;&gt;[link]&lt;/a&gt;&lt;/span&gt; &amp;#32; &lt;span&gt;&lt;a href=&quot;https://redd.it/1abcd07&quot;&gt;[comments]&lt;/a&gt;&lt;/span&gt; &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</content>
+    <id>t3_1abcd07</id>
+    <link href="https://redd.it/1abcd07"/>
+    <updated>2022-02-20T20:20:20+00:00</updated>
+    <title>Interesting kernel news</title>
+  </entry>
+  <entry>
+    <author><name>/u/evil_user</name><uri>https://www.reddit.com/user/evil_user</uri></author>
+    <category term="homelab" label="r/homelab"/>
+    <content type="html">&lt;table&gt; &lt;tr&gt;&lt;td&gt; &lt;a href=&quot;https://www.reddit.com/r/homelab/comments/1abcd08/is_proxmox_worth_it/&quot;&gt; &lt;img src=&quot;https://evil.example/tracker.png&quot; alt=&quot;thumbnail&quot; title=&quot;thumbnail&quot; /&gt; &lt;/a&gt; &lt;/td&gt;&lt;td&gt; &lt;!-- SC_OFF --&gt;&lt;div class=&quot;md&quot;&gt;&lt;p&gt;Hello &lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;&lt;img src=&quot;x&quot; onerror=&quot;alert(2)&quot;&gt; &lt;a href=&quot;javascript:alert(3)&quot;&gt;click&lt;/a&gt; AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&lt;/p&gt;&lt;/div&gt;&lt;!-- SC_ON --&gt; &amp;#32; submitted by &amp;#32; &lt;a href=&quot;https://www.reddit.com/user/evil_user&quot;&gt; /u/evil_user &lt;/a&gt; &lt;br/&gt; &lt;span&gt;&lt;a href=&quot;https://www.reddit.com/r/homelab/comments/1abcd08/is_proxmox_worth_it/&quot;&gt;[link]&lt;/a&gt;&lt;/span&gt; &amp;#32; &lt;span&gt;&lt;a href=&quot;https://www.reddit.com/r/homelab/comments/1abcd08/is_proxmox_worth_it/&quot;&gt;[comments]&lt;/a&gt;&lt;/span&gt; &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</content>
+    <id>t3_1abcd08</id>
+    <link href="https://www.reddit.com/r/homelab/comments/1abcd08/is_proxmox_worth_it/"/>
+    <updated>2024-05-05T05:05:05+00:00</updated>
+    <published>2024-05-05T05:05:05+00:00</published>
+    <title>Is &lt;script&gt;alert(1)&lt;/script&gt;Proxmox worth it? &lt;b&gt;Bold&lt;/b&gt; &amp;amp; more</title>
+  </entry>
+</feed>
