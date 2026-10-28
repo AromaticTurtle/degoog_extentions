@@ -8,8 +8,13 @@ export const DEFAULT_RECOMMEND_BASE = "https://recommend.games";
 const SEARCH_TTL_MS = 24 * 60 * 60_000;
 const DEFAULT_DAILY_LIMIT = 500;
 
+// Without an explicit ordering the server sorts every match by its own recommendation rating, and a search such as
+// "wingspan" then takes 15 to 20 seconds. Sorted by the number of votes it answers in 1 to 2 seconds (measured), returns
+// the same games, and puts the best known ones on the first page, which is the page that is read.
+export const RECOMMEND_ORDERING = "-num_votes";
+
 export const recommendSearchUrl = (term, base = DEFAULT_RECOMMEND_BASE) =>
-  `${String(base || DEFAULT_RECOMMEND_BASE).replace(/\/+$/, "")}/api/games/?${new URLSearchParams({ search: sanitizeTerm(term) })}`;
+  `${String(base || DEFAULT_RECOMMEND_BASE).replace(/\/+$/, "")}/api/games/?${new URLSearchParams({ search: sanitizeTerm(term), ordering: RECOMMEND_ORDERING })}`;
 
 // Source 2: recommend.games, a small third-party site that mirrors BoardGameGeek data. No key.
 // One request returns everything: the fuzzy matches (expansions removed) are matched locally.

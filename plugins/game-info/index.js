@@ -33,8 +33,17 @@ const EMPTY = { title: "", html: "" };
 
 // The board-games plugin (same degoog process) registers a lookup function under this symbol; see its README.
 export const BOARD_GAMES_LOOKUP = Symbol.for("degoog-extentions.board-games.lookup");
-const BOARD_WAIT_MAX_MS = 2500;
+const BOARD_WAIT_DEFAULT_SECONDS = 5;
+const BOARD_WAIT_MIN_SECONDS = 1;
+const BOARD_WAIT_MAX_SECONDS = 8;
 const BOARD_WAIT_MIN_MS = 200;
+
+// The setting in seconds, clamped to 1..8; anything unreadable is the default.
+export const boardWaitFromSetting = (value) => {
+  const seconds = Number.parseFloat(String(value ?? ""));
+  if (!Number.isFinite(seconds)) return BOARD_WAIT_DEFAULT_SECONDS * 1000;
+  return Math.round(Math.min(BOARD_WAIT_MAX_SECONDS, Math.max(BOARD_WAIT_MIN_SECONDS, seconds)) * 1000);
+};
 
 const slotTimeoutMs = () => {
   const configured = Number.parseInt(process.env.DEGOOG_SLOT_TIMEOUT_MS ?? "", 10);
@@ -81,6 +90,7 @@ export class GameInfoSlot {
   showDescription = true;
   debugMatching = false;
   preferBoardGames = true;
+  boardWaitMs = BOARD_WAIT_DEFAULT_SECONDS * 1000;
   // degoog gives a slot 10 s (DEGOOG_SLOT_TIMEOUT_MS). The wait for the board game answer never ends after 70 % of it,
   // which leaves the rest for the IGDB follow-up requests.
   startWindowMs = Math.max(1000, Math.round(slotTimeoutMs() * 0.7));
@@ -116,6 +126,7 @@ export class GameInfoSlot {
     this.showDescription = truthy(settings.showDescription, true);
     this.debugMatching = truthy(settings.debugMatching, false);
     this.preferBoardGames = truthy(settings.preferBoardGames, true);
+    this.boardWaitMs = boardWaitFromSetting(settings.boardGameWaitSeconds);
   }
 
   isPaused(upstream) {
@@ -322,7 +333,7 @@ export class GameInfoSlot {
     if (!this.preferBoardGames || hasVideoGameWord(query)) return false;
     const lookup = this.boardLookup();
     if (typeof lookup !== "function") return false;
-    const waitMs = Math.min(BOARD_WAIT_MAX_MS, startedAt + this.startWindowMs - this.now());
+    const waitMs = Math.min(this.boardWaitMs, startedAt + this.startWindowMs - this.now());
     let outcome = { status: "unknown" };
     if (waitMs >= BOARD_WAIT_MIN_MS) {
       let timer;

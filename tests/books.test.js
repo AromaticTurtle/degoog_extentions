@@ -1479,3 +1479,36 @@ describe("explaining decisions (debugMatching)", () => {
     expect(field.fieldset).toBeTruthy();
   });
 });
+
+describe("the series note in the explain output", () => {
+  const two = delver({ id: 7100002, title: "The Flooded Stairwell", featured_series: { series: { name: "Cellar Delver Ned" }, position: 2 }, featured_series_position: 2 });
+  const three = delver({ id: 7100003, title: "Ned and the Lantern Crown", featured_series: { series: { name: "Cellar Delver Ned" }, position: 3 }, featured_series_position: 3 });
+  const other = compactBook({ id: 5, title: "Other Tale", users_count: 5 });
+  const explain = (query, books) => {
+    const parsed = parseQuery(query);
+    return formatExplanation(query, parsed, evaluate(parsed, books, { explain: true })).split("\n");
+  };
+
+  test("only the candidate that the series rule selected carries the note", () => {
+    const lines = explain("cellar delver ned", [three, two, other]);
+    const noted = lines.filter((line) => line.includes("chosen as the first book of the series"));
+    expect(noted).toHaveLength(1);
+    expect(noted[0]).toContain('"The Flooded Stairwell"'); // the lowest position that came back
+    expect(lines.filter((line) => line.includes("series name matches"))).toHaveLength(0);
+    expect(lines.find((line) => line.includes("Ned and the Lantern Crown"))).not.toContain("series");
+    expect(lines.find((line) => line.includes("Other Tale"))).not.toContain("series");
+    expect(lines.at(-1)).toContain("first book of the series the query names");
+  });
+
+  test("a query that is decided by the title, not the series, has no series note at all", () => {
+    const lines = explain("cellar delver ned", [delver(), two, three]);
+    expect(lines.join("\n")).not.toContain("series name");
+    expect(lines.join("\n")).not.toContain("chosen as the first book");
+    expect(lines.at(-1)).toContain("exact title");
+  });
+
+  test("no panel: no note on any candidate", () => {
+    const lines = explain("cellar delver", [two, three, other]);
+    expect(lines.join("\n")).not.toContain("chosen as the first book");
+  });
+});

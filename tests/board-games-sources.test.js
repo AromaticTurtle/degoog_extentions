@@ -276,6 +276,9 @@ describe("recommend.games parsing", () => {
     const url = new URL(recommendSearchUrl("star fall & co", "https://rg.test/"));
     expect(url.origin + url.pathname).toBe("https://rg.test/api/games/");
     expect(url.searchParams.get("search")).toBe("star fall & co");
+    // an explicit ordering by votes: the default ordering makes the server take 15 to 20 s for the same search
+    expect(url.searchParams.get("ordering")).toBe("-num_votes");
+    expect([...url.searchParams.keys()].sort()).toEqual(["ordering", "search"]);
     expect(recommendSearchUrl("x").startsWith(`${DEFAULT_RECOMMEND_BASE}/api/games/?`)).toBe(true);
   });
 });
@@ -1744,5 +1747,35 @@ describe("the lookup contract (lookupTitle)", () => {
     const slot = make();
     const panel = await slot.execute("starfall game", makeContext());
     expect(panel.title).toBe("Starfall");
+  });
+});
+
+describe("the recommend.games request is the fast one", () => {
+  test("a cold search sends the vote ordering, one request, and the answer is matched as before", async () => {
+    const slot = make({ enableApi: "false" });
+    const context = makeContext({ recommend: SKYREACH_REPLY });
+    expect((await slot.execute("skyreach", context)).title).toBe("Skyreach");
+    const calls = context.calls.filter((call) => call.kind === "rg");
+    expect(calls).toHaveLength(1);
+    const url = new URL(calls[0].url);
+    expect(url.pathname).toBe("/api/games/");
+    expect(url.searchParams.get("search")).toBe("skyreach");
+    expect(url.searchParams.get("ordering")).toBe("-num_votes");
+    expect(context.calls.filter((call) => call.kind !== "rg")).toHaveLength(0); // no Wikidata or website API call
+  });
+
+  test("the ordering also applies to the lookup that game-info asks for", async () => {
+    const slot = make({ enableApi: "false" });
+    const context = makeContext({ recommend: SKYREACH_REPLY });
+    expect(await slot.lookupTitle({ term: "skyreach", deadlineMs: 1000, context })).toMatchObject({ status: "match", name: "Skyreach" });
+    expect(new URL(context.calls[0].url).searchParams.get("ordering")).toBe("-num_votes");
+  });
+
+  test("the vote ordering puts the best known game first, which earns the first-result bonus", async () => {
+    const reply = JSON.stringify({
+      results: [rgResult(910001, "Skyreach", 60), rgResult(910006, "Skyreach Duel", 30)],
+    });
+    // 60 votes: "skyreach" is a medium query (exact bar 100), halved for a first result = 50, so it shows
+    expect((await make({ enableApi: "false" }).execute("skyreach", makeContext({ recommend: reply }))).title).toBe("Skyreach");
   });
 });

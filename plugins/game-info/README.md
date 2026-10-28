@@ -69,6 +69,8 @@ for 7 days (including "none"). Identical simultaneous searches share a request. 
   appears when IGDB knows the Steam page.
 - **Prefer the board game panel**: on by default. When a board game with the same title matches, the board game panel shows
   and this one is hidden (see "Board game or video game?" below).
+- **How long to wait for the board game answer** (advanced, 5 seconds, 1 to 8): how long a video game match waits for the Board
+  games plugin before it shows itself. A slow answer is cached, so the board game wins on the next search.
 - **Show a short description**: on by default.
 
 ## The sources, and their terms (please read)
@@ -103,10 +105,11 @@ title, this panel is hidden and only the board game panel shows. So plain `wings
   the video game shows.
 - **How it works:** the Board games plugin registers one function in the degoog process
   (`globalThis[Symbol.for("degoog-extentions.board-games.lookup")]`). This plugin calls it only after it already has a
-  confident pick, waits at most 2.5 s (and never past 70 % of `DEGOOG_SLOT_TIMEOUT_MS`), and only a clear `match` hides the
+  confident pick, waits at most **5 s** (setting **How long to wait for the board game answer**, 1 to 8 seconds, never past
+  70 % of `DEGOOG_SLOT_TIMEOUT_MS`), and only a clear `match` hides the
   panel. The two plugins share requests and caches, so asking costs nothing extra. Degoog runs slot plugins one after the
   other, so it does not matter which runs first (`priority`, then folder name).
-- **A cold first search:** if the board game lookup is slower than the wait (recommend.games can need 15 s or more), the video
+- **A cold first search:** if the board game lookup is slower than the wait (a cold recommend.games or BGG answer takes 1 to 5 s), the video
   game shows first. The board game's late reply is cached, so the next search for the title shows only the board game.
 - **Troubleshooting:** with **Explain matching in the log** on, the decision is one log line, for example
   `[game-info] "wingspan" hidden, a board game matches: "Wingspan" (id 266192)` or

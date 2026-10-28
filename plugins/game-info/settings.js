@@ -57,6 +57,18 @@ export const SETTINGS_SCHEMA = [
       "When a board game with the same title matches, show the board game panel and hide this one. Needs the Board games plugin; without it nothing changes. Queries with a video game word (ps5, steam, walkthrough...) always show this panel, and queries with a board game word (board game, rules, tabletop...) never do.",
   },
   {
+    key: "boardGameWaitSeconds",
+    fieldset: "Display",
+    advanced: true,
+    label: "How long to wait for the board game answer (seconds)",
+    type: "number",
+    default: "5",
+    placeholder: "5",
+    visibleWhen: { key: "preferBoardGames", equals: "true" },
+    description:
+      "When a video game matches, this plugin asks the Board games plugin whether a board game with the same title matches, and waits at most this long (1 to 8 seconds, and never past 70 % of degoog's slot time). On a slow answer the video game shows and the board game appears from the cache on the next search. A cold answer from the BGG API or recommend.games takes about 1 to 5 seconds.",
+  },
+  {
     key: "debugMatching",
     fieldset: "Troubleshooting",
     advanced: true,

@@ -362,7 +362,9 @@ export const formatExplanation = (query, parsed, result, source = "hardcover") =
       .map(([name, value]) => `${name}=${value}`)
       .join(",");
     const verdict = row.verdict.accepted ? `accepted by ${row.verdict.rule}` : `rejected: ${row.verdict.rule}`;
-    const series = row.seriesVerdict ? `; series name matches (${row.seriesVerdict.accepted ? "accepted" : "rejected"}: ${row.seriesVerdict.rule})` : "";
+    // The series-name rule is only worth a note on the book it actually selected.
+    const bySeries = row.book === result.pick && result.how.startsWith("first book of the series") && row.seriesVerdict;
+    const series = bySeries ? `; chosen as the first book of the series the query names (${row.seriesVerdict.rule})` : "";
     lines.push(`  #${row.rank + 1} "${oneLine(row.book.title)}" sim=${row.score.sim.toFixed(2)} signals[${signals || "none"}] pop=${row.pop} -> ${verdict}${series}`);
   }
   if (!result.rows.length) lines.push("  (no candidates)");

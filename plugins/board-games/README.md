@@ -153,8 +153,8 @@ walkthrough`, `elden ring steam`, `remake`, `rpg`...) never reaches this plugin;
   plain title does not satisfy), when it was too slow, or on any failure. It uses the same sources, caches, pauses, limits and
   single-flight as a search, so asking and searching for the same title cost one request together. It never throws, makes
   no request without a usable source, and waits at most `deadlineMs`; a slower reply keeps running and fills the cache.
-- **A cold first search** that is too slow for the slot (recommend.games: 15 to 25 s) gives no board game panel; the lookup
-  then says `unknown`, so the video game shows first. The next search finds the cached board game and only that panel shows.
+- **A cold first search** that is too slow for the slot (recommend.games needs 1 to 5 s with its vote ordering, see
+  "Performance") gives no board game panel; the lookup then says `unknown`, so the video game shows first. The next search finds the cached board game and only that panel shows.
 - With **Explain matching in the log** on, each question from Game info is one line:
   `[board-games] "wingspan" asked about by game-info: match "Wingspan"` (or `none`, `unknown`).
 
@@ -167,13 +167,28 @@ get this bonus). Edition marks and brackets are ignored on both sides, and a gam
 Latin letters: a name in another script would lose its letters and could look identical to a different game. The numbers are
 the constants at the top of `match.js` (`BARS`, the intent thresholds) and were chosen without real data.
 
+## Performance: why recommend.games is asked for an ordering
+Measured against the live service (a handful of requests, spaced out, nothing stored): `GET /api/games/?search=wingspan`
+takes **15 to 20 seconds** (17 s, 17 s and 19 s in three tries), while the same search with `&ordering=-num_votes` takes
+**1 to 5 seconds** (2.2 s, 5.0 s for wingspan, 1.0 s for catan, 0.6 s for gloomhaven; 6 to 78 matches, the same games). The
+server's default ordering is its own recommendation rating, which is expensive to sort. The plugin therefore always sends
+`ordering=-num_votes`; as a bonus the best known games are on the first page, which is the one that is read.
+
+Other things that were checked and do **not** help: `limit`, `page_size` and `fields` are ignored by the API (it is a
+plain Django REST Framework list: 25 per page, a name `icontains` search, no dynamic fields), and `bgg_id` and `name` are
+not filters. The detail route `/api/games/<bgg id>/` answers in about 0.35 s with everything the panel needs, but there is no
+way to ask for a game by name there, so it would need a name-to-id step first (Wikidata, about 0.4 s per call, 2 calls);
+that is not needed while the ordered search stays fast, and it only covers games that have a Wikidata item with a BGG id
+(for example "Catan" is labelled "The Settlers of Catan" there). BGG's website API answers in 0.1 to 0.2 s but cannot search
+by name and stays opt-in. If recommend.games ever becomes slow again, the late reply is still cached and the next search for
+the title is instant (see Troubleshooting).
+
 ## Troubleshooting: why did (or didn't) a panel show
-- **The first search for a game shows nothing, the second one works.** recommend.games can take **15 to 25 seconds** to answer
-  a search (measured for `wingspan`), and degoog gives a slot 10 seconds. The plugin gives up on that search just before
-  degoog's limit, but the request keeps running and its answer is **cached**, so searching again a moment later shows the
-  panel at once (and costs no request). A second search while the first is still running shares it. Sources that are fast
-  (the BGG XML API with a token, typically a couple of seconds) do not have this problem; that is the main reason to set up a
-  token.
+- **The first search for a game shows nothing, the second one works.** This happens when a source needs more than the 10
+  seconds degoog gives a slot (recommend.games did without the ordering above; it now needs 1 to 5 seconds). The plugin gives
+  up on that search just before degoog's limit, but the request keeps running and its answer is **cached**, so searching
+  again a moment later shows the panel at once (and costs no request). A second search while the first is still running
+  shares it. The BGG XML API with a token typically answers in a couple of seconds.
 - Turn on **Explain matching in the log** (Settings > Plugins > Board games > Configure, under Troubleshooting; off by default,
   no cost when off). Every lookup then writes one block to the server log: which source answered, the candidates (up to six),
   how well each title fits, the rating counts and the rule that accepted a game or what it was missing, for example
@@ -191,8 +206,10 @@ the constants at the top of `match.js` (`BARS`, the intent thresholds) and were 
 - recommend.games returns every fuzzy match for a search and its ordering is not verified: the plugin reads the first 30
   results, drops expansions, and matches locally, so a game far down a very long list of matches can be missed. Only the "first
   result needs half the ratings" bonus relies on the order, and only for a close title match.
-- recommend.games is slow (15 to 25 seconds for a search), see "Troubleshooting" above: the first search of a new title
-  usually shows nothing when it is the only source in use.
+- recommend.games answers in 1 to 5 seconds with the vote ordering (15 to 20 without it), see "Performance" above. It is a small
+  third-party service: if it slows down again, the first search of a new title shows nothing and the next one works.
+- A game that is not on the first page of matches (25, best known first) is not seen, which only matters for obscure games with a
+  very common word in their name.
 - The matching constants were chosen without real data and will need tuning.
 - If BGG or recommend.games change their formats, the affected source becomes "unavailable" and the chain moves on.
 

@@ -8,6 +8,8 @@
 //   "apidown" -> the XML API search answers 503     "recdown" -> recommend.games answers 503
 //   "cfblock" -> from then on the geekdo endpoints answer a Cloudflare-style 403 page (GET /__reset clears it)
 //   "quota"   -> the XML API and recommend.games answer 429     "zzz" -> every search finds nothing
+// MOCK_RG_UNORDERED_DELAY_MS=17000 makes recommend.games answer slowly unless the request asks for an explicit ordering
+// (ordering=-num_votes), like the real service: 15 to 20 s without it, 1 to 2 s with it.
 // MOCK_DELAY_MS=4000 (environment) makes every answer except /__stats and /__reset wait that long first, to try a slow upstream.
 // GET /__stats reports the requests served per upstream.
 // Usage: bun tests/mock-board-games-server.js [port]
@@ -15,6 +17,7 @@
 //   DEGOOG_GEEKDO_BASE=http://host:4469/geekdo/api  DEGOOG_WIKIDATA_API=http://host:4469/wikidata/w/api.php
 const port = Number(process.argv[2] || 4469);
 const delayMs = Number(process.env.MOCK_DELAY_MS || 0);
+const unorderedDelayMs = Number(process.env.MOCK_RG_UNORDERED_DELAY_MS || 0);
 const text = (name) => Bun.file(new URL(`./fixtures/${name}`, import.meta.url)).text();
 const json = (name) => Bun.file(new URL(`./fixtures/${name}`, import.meta.url)).json();
 const search = await text("bgg-search.xml");
@@ -82,6 +85,7 @@ Bun.serve({
     if (url.pathname === "/recommend/api/games/") {
       stats.recommend.search += 1;
       const term = url.searchParams.get("search") ?? "";
+      if (unorderedDelayMs > 0 && !url.searchParams.get("ordering")) await Bun.sleep(unorderedDelayMs);
       if (term.includes("recdown")) return new Response("Bad gateway", { status: 503 });
       if (term.includes("quota")) return new Response("slow down", { status: 429, headers: { "retry-after": "120" } });
       if (term.includes("zzz")) return Response.json({ count: 0, next: null, previous: null, results: [] });

@@ -53,7 +53,7 @@ import {
 import { SETTINGS_SCHEMA } from "../plugins/game-info/settings.js";
 import { compactGame, compactProton, compactTimeToBeat, isoDate, steamAppIdOf } from "../plugins/game-info/shape.js";
 import { buildPanel, esc, formatDate, safeUrl, summarize, timeToBeatText } from "../plugins/game-info/render.js";
-import { BOARD_GAMES_LOOKUP, GameInfoSlot, slot as defaultSlot } from "../plugins/game-info/index.js";
+import { BOARD_GAMES_LOOKUP, GameInfoSlot, boardWaitFromSetting, slot as defaultSlot } from "../plugins/game-info/index.js";
 
 const read = (path) => Bun.file(new URL(path, import.meta.url));
 const gamesFixture = await read("./fixtures/igdb-games.json").json();
@@ -1631,7 +1631,7 @@ describe("preferring the board game panel", () => {
     expect(board.calls[0].term).toBe("skyrim");
     expect(board.calls[0].context).toBe(context);
     expect(board.calls[0].deadlineMs).toBeGreaterThan(0);
-    expect(board.calls[0].deadlineMs).toBeLessThanOrEqual(2500);
+    expect(board.calls[0].deadlineMs).toBeLessThanOrEqual(5000);
     expect(kinds(context)).toEqual(["token", "search"]); // no time to beat, Steam or ProtonDB request for a hidden panel
   });
 
@@ -1657,13 +1657,13 @@ describe("preferring the board game panel", () => {
     expect(Date.now() - started).toBeLessThan(1000);
   });
 
-  test("the wait is the time left of 70 % of the slot timeout, at most 2.5 s, and skipped when almost nothing is left", async () => {
+  test("the wait is the setting (5 s by default), capped by the time left of 70 % of the slot timeout, and skipped when almost nothing is left", async () => {
     const board = fakeBoard({ status: "none" });
     const roomy = withBoard({}, board);
     roomy.startWindowMs = 7000;
     await roomy.execute("skyrim", makeContext());
-    expect(board.calls[0].deadlineMs).toBeLessThanOrEqual(2500);
-    expect(board.calls[0].deadlineMs).toBeGreaterThan(2000);
+    expect(board.calls[0].deadlineMs).toBeLessThanOrEqual(5000);
+    expect(board.calls[0].deadlineMs).toBeGreaterThan(4500);
 
     const tight = fakeBoard({ status: "none" });
     const small = withBoard({}, tight);
@@ -1813,5 +1813,48 @@ describe("preferring the board game panel", () => {
     expect(line.includes("\n")).toBe(false);
     expect(line).not.toContain("<script>");
     expect(line.length).toBeLessThan(250);
+  });
+});
+
+describe("how long to wait for the board game answer (boardGameWaitSeconds)", () => {
+  const waitFor = async (settings, startWindowMs = 8000) => {
+    const calls = [];
+    const slot = make({ clientId: ID, clientSecret: SECRET, ...settings });
+    slot.startWindowMs = startWindowMs;
+    slot.boardLookup = () => async (request) => {
+      calls.push(request.deadlineMs);
+      return { status: "none" };
+    };
+    await slot.execute("skyrim", makeContext());
+    return calls[0];
+  };
+
+  test("the setting is an advanced number, 5 seconds by default, shown only while the preference is on", () => {
+    const field = SETTINGS_SCHEMA.find((entry) => entry.key === "boardGameWaitSeconds");
+    expect(field).toMatchObject({ type: "number", default: "5", advanced: true, visibleWhen: { key: "preferBoardGames", equals: "true" } });
+    expect(field.required).toBeUndefined();
+    expect(make().boardWaitMs).toBe(5000);
+  });
+
+  test("seconds are converted and clamped to 1..8, anything unreadable is the default", () => {
+    expect(boardWaitFromSetting("4")).toBe(4000);
+    expect(boardWaitFromSetting("5")).toBe(5000);
+    expect(boardWaitFromSetting(6)).toBe(6000);
+    expect(boardWaitFromSetting("2.5")).toBe(2500);
+    expect(boardWaitFromSetting("0")).toBe(1000);
+    expect(boardWaitFromSetting("-3")).toBe(1000);
+    expect(boardWaitFromSetting("0.2")).toBe(1000);
+    expect(boardWaitFromSetting("8")).toBe(8000);
+    expect(boardWaitFromSetting("30")).toBe(8000);
+    for (const bad of ["", "soon", undefined, null, NaN, Infinity, {}]) expect(boardWaitFromSetting(bad)).toBe(5000);
+  });
+
+  test("the configured wait reaches the lookup, still capped by what is left of the slot budget", async () => {
+    expect(await waitFor({ boardGameWaitSeconds: "6" })).toBeLessThanOrEqual(6000);
+    expect(await waitFor({ boardGameWaitSeconds: "6" })).toBeGreaterThan(5500);
+    expect(await waitFor({ boardGameWaitSeconds: "1" })).toBeLessThanOrEqual(1000);
+    expect(await waitFor({ boardGameWaitSeconds: "99" })).toBeLessThanOrEqual(8000);
+    expect(await waitFor({ boardGameWaitSeconds: "6" }, 3000)).toBeLessThanOrEqual(3000); // 70 % of the slot time is the limit
+    expect(await waitFor({})).toBeLessThanOrEqual(5000);
   });
 });
