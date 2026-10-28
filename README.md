@@ -26,6 +26,8 @@ In degoog: **Settings > Store > Add repository**, paste `https://github.com/Arom
 | [Currency converter](plugins/currency/README.md) | slot plugin | Fiat conversion from open.er-api.com (one cached request a day, cross rates computed locally) and crypto prices from Coinbase's public API with 24 h change and range. No keys. Inline or panel. |
 | [Dictionary](plugins/dictionary/README.md) | slot plugin | `define X`, `X meaning`, `synonyms of X`, `how to pronounce X` from the Free Dictionary API (Wiktionary, CC BY-SA): meanings, examples, synonyms, pronunciation audio. Inline or panel. Replaces the official define plugin. |
 | [Reddit lens](plugins/reddit-lens/README.md) | interceptor | `best homelab os reddit`, `reddit best homelab os`, `!reddit ...` and `r/homelab ...` become a `site:reddit.com` search, so your normal web engines return Reddit pages with their own titles, snippets and dates. Makes no request itself. |
+| [Stocks (Finnhub)](plugins/stocks/README.md) | slot plugin | A stock quote card for `AAPL stock`, `$AAPL`, `apple stock price` and (optionally) a bare ticker: price, change, market status, day and 52-week ranges, statistics, sparkline when available. Needs a free Finnhub API key (US stocks on the free plan), sent only in a header. Inline or panel. |
+| [Weather](plugins/weather/README.md) | slot plugin | `weather in Paris`, `forecast`, `is it raining in Seattle`: current conditions, a 24-hour strip, a 7-day forecast and air quality from Open-Meteo (no key). Understands `paris texas`. Inline or panel. Replaces the official weather plugin. |
 
 ## Planned
 

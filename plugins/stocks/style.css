@@ -1,0 +1,280 @@
+/* Stock card. Uses degoog's theme variables so it follows the light and dark themes. */
+/* degoog's .command-result adds padding and a max width; the slot panel already pads the card */
+.command-result.stocks-result {
+  display: block;
+  max-width: none;
+  padding: 0;
+}
+
+.stocks-card {
+  --stocks-up: #1e8e3e;
+  --stocks-down: #d93025;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+[data-theme="dark"] .stocks-card {
+  --stocks-up: #81c995;
+  --stocks-down: #f28b82;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .stocks-card {
+    --stocks-up: #81c995;
+    --stocks-down: #f28b82;
+  }
+}
+
+.stocks-card *,
+.stocks-card *::before,
+.stocks-card *::after {
+  box-sizing: border-box;
+}
+
+.stocks-kicker {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stocks-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.stocks-logo {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #fff;
+  object-fit: contain;
+}
+
+.stocks-head-text {
+  min-width: 0;
+}
+
+.stocks-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.stocks-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.stocks-price-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.stocks-price {
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stocks-card--panel .stocks-price {
+  font-size: 2rem;
+}
+
+.stocks-currency {
+  margin-left: -4px;
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.stocks-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stocks-change--up {
+  color: var(--stocks-up);
+}
+
+.stocks-change--down {
+  color: var(--stocks-down);
+}
+
+.stocks-change--flat {
+  color: var(--text-secondary);
+}
+
+.stocks-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.stocks-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.stocks-pill--open circle {
+  fill: var(--stocks-up);
+}
+
+.stocks-pill--pre circle,
+.stocks-pill--post circle {
+  fill: var(--warning, #c17d00);
+}
+
+.stocks-pill--closed circle {
+  fill: var(--text-secondary);
+}
+
+.stocks-spark {
+  display: block;
+  height: 32px;
+}
+
+.stocks-spark--up {
+  color: var(--stocks-up);
+}
+
+.stocks-spark--down {
+  color: var(--stocks-down);
+}
+
+.stocks-spark--flat {
+  color: var(--text-secondary);
+}
+
+.stocks-range-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stocks-range-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stocks-range {
+  display: block;
+  height: 4px;
+}
+
+.stocks-range-track {
+  fill: var(--border);
+}
+
+.stocks-range-marker {
+  fill: var(--text-primary);
+}
+
+.stocks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.stocks-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.stocks-cell-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stocks-cell-label {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.stocks-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+}
+
+.stocks-links a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+}
+
+.stocks-links a:hover {
+  color: var(--text-link);
+}
+
+.stocks-footer {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.stocks-card--panel .stocks-footer {
+  padding-top: 4px;
+  border-top: 0;
+  font-size: 0.6875rem;
+}
+
+.stocks-footer a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+}
+
+.stocks-footer a:hover {
+  color: var(--text-link);
+}

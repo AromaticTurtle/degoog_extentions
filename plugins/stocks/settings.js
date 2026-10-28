@@ -1,0 +1,58 @@
+export const SETTINGS_SCHEMA = [
+  {
+    key: "apiKey",
+    fieldset: "Finnhub",
+    label: "Finnhub API key",
+    type: "password",
+    secret: true,
+    placeholder: "Your free key from finnhub.io",
+    description:
+      "Create a free account at https://finnhub.io/register, then copy the API key from the dashboard (https://finnhub.io/dashboard). Paste it here. It is stored on the server only and sent only in a request header (X-Finnhub-Token), never in a web address or the log. FINNHUB_API_KEY in the container environment is used when this is empty. Without a key the plugin shows nothing. The free plan covers US stocks only.",
+  },
+  {
+    key: "layout",
+    fieldset: "Display",
+    label: "Layout",
+    type: "select",
+    default: "inline",
+    options: ["inline", "panel"],
+    optionLabels: ["Inline: detailed card above the results", "Panel: compact card in the side column"],
+    description: "Inline is the detailed card (ranges, statistics, company, sparkline when available) above the results. Panel is the compact card (price, change, market status, day range) in the side column. The card moves as soon as you save.",
+  },
+  {
+    key: "showSparkline",
+    fieldset: "Display",
+    label: "Show a price sparkline when available",
+    type: "toggle",
+    default: "true",
+    description: "Needs candle data, which Finnhub's free plan may not include. The plugin tries once; if Finnhub refuses (403) it remembers that for a day and stops asking.",
+  },
+  {
+    key: "triggerOnBareTicker",
+    fieldset: "Matching",
+    label: "Show a card for a bare ticker (AAPL, TSLA, MSFT)",
+    type: "toggle",
+    default: "true",
+    description:
+      "On: a query that is only a ticker shows the card when it checks out: capitals or a well-known ticker, not a common word or a currency/crypto code, and Finnhub confirms the symbol and a positive price (two requests at most, remembered for a day when it is not a ticker). '$AAPL', 'AAPL stock', 'apple stock price' and 'stock AAPL' always work. Off: only the explicit forms.",
+  },
+  {
+    key: "dailyRequestLimit",
+    fieldset: "Limits",
+    advanced: true,
+    label: "Daily request limit",
+    type: "number",
+    default: "2000",
+    placeholder: "2000",
+    description: "Stops calling Finnhub once this many requests were made in a UTC day. Separately, requests are kept under 50 a minute (the free plan allows 60). A card costs a quote plus a company profile (cached 7 days), key statistics (cached 6 hours) and the market status (cached 2 minutes). 0 turns the daily cap off. The count is kept in data/stocks/usage.json.",
+  },
+  {
+    key: "debugMatching",
+    fieldset: "Troubleshooting",
+    advanced: true,
+    label: "Explain matching in the log",
+    type: "toggle",
+    default: "false",
+    description: "On: a query that looks like a stock query writes one block to the server log: which rule matched, how the symbol was found, what each Finnhub call returned (status only), and why there was no card (no API key, a paused key, a symbol Finnhub does not know...). Only the query text is logged, never the key. Off by default.",
+  },
+];

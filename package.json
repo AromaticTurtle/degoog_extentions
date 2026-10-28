@@ -59,6 +59,22 @@
       "version": "1.0.0",
       "type": "interceptor",
       "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "plugins/stocks",
+      "name": "Stocks (Finnhub)",
+      "description": "Stock quote card for 'AAPL stock', '$AAPL', 'apple stock price' and (optionally) a bare ticker: price, change, market status, day and 52-week ranges, statistics, sparkline when available. Needs a free Finnhub API key (US stocks on the free plan); sent only in a header. Inline (detailed) or panel (compact).",
+      "version": "1.0.0",
+      "type": "slot",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "plugins/weather",
+      "name": "Weather",
+      "description": "Weather card for 'weather in Paris', 'forecast', 'is it raining in Seattle': current conditions, 24-hour strip, 7-day forecast, air quality, from Open-Meteo (no key). Disambiguates 'paris texas'. Inline (detailed) or panel (compact). Replaces the official weather plugin.",
+      "version": "1.0.0",
+      "type": "slot",
+      "minDegoogVersion": "1.1.0"
     }
   ],
   "engines": [
