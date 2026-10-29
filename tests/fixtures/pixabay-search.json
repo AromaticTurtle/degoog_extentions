@@ -1,0 +1,99 @@
+{
+ "total": 4692,
+ "totalHits": 500,
+ "hits": [
+  {
+   "id": 900001,
+   "pageURL": "https://pixabay.com/photos/quillfern-meadow-900001/",
+   "type": "photo",
+   "tags": "quillfern, meadow, green",
+   "previewURL": "https://cdn.pixabay.com/photo/2026/01/01/00/00/quillfern-900001_150.jpg",
+   "previewWidth": 150,
+   "previewHeight": 100,
+   "webformatURL": "https://pixabay.com/get/aa900001_640.jpg",
+   "webformatWidth": 640,
+   "webformatHeight": 427,
+   "largeImageURL": "https://pixabay.com/get/bb900001_1280.jpg",
+   "fullHDURL": "https://pixabay.com/get/cc900001_1920.jpg",
+   "imageURL": "https://pixabay.com/get/dd900001.jpg",
+   "vectorURL": "https://pixabay.com/get/ee900001.svg",
+   "imageWidth": 4000,
+   "imageHeight": 2667,
+   "imageSize": 4731420,
+   "views": 7671,
+   "downloads": 6439,
+   "likes": 5,
+   "comments": 2,
+   "user_id": 4801,
+   "user": "Test_Photographer",
+   "userImageURL": "https://cdn.pixabay.com/user/2026/01/01/00-00-00-000_250x250.jpg"
+  },
+  {
+   "id": 900002,
+   "pageURL": "https://pixabay.com/illustrations/florbit-bell-900002/",
+   "type": "illustration",
+   "tags": "florbit, bell, invented",
+   "previewURL": "https://cdn.pixabay.com/photo/2026/01/02/00/00/florbit-900002_150.png",
+   "webformatURL": "https://pixabay.com/get/aa900002_640.png",
+   "webformatWidth": 640,
+   "webformatHeight": 640,
+   "largeImageURL": "https://pixabay.com/get/bb900002_1280.png",
+   "user_id": 4802,
+   "user": "Invented-Artist"
+  },
+  {
+   "id": 900003,
+   "pageURL": "https://pixabay.com/vectors/lake-dawn-900003/",
+   "type": "vector",
+   "tags": "",
+   "previewURL": "https://cdn.pixabay.com/photo/2026/01/03/00/00/lake-900003_150.png",
+   "user_id": 4803,
+   "user": "Some One",
+   "imageWidth": 1200,
+   "imageHeight": 800
+  },
+  {
+   "id": 900004,
+   "pageURL": "https://pixabay.com/photos/hosted-elsewhere-900004/",
+   "type": "photo",
+   "tags": "elsewhere",
+   "webformatURL": "https://evil.example/x_640.jpg",
+   "largeImageURL": "https://evil.example/x_1280.jpg",
+   "user": "Nobody",
+   "user_id": 1
+  },
+  {
+   "id": 900005,
+   "pageURL": "https://pixabay.com/photos/quillfern-meadow-900001/",
+   "type": "photo",
+   "tags": "duplicate page",
+   "webformatURL": "https://pixabay.com/get/aa900005_640.jpg",
+   "largeImageURL": "https://pixabay.com/get/bb900005_1280.jpg",
+   "user": "Dup",
+   "user_id": 2
+  },
+  {
+   "id": 900006,
+   "type": "photo",
+   "tags": "no page url",
+   "webformatURL": "https://pixabay.com/get/aa900006_640.jpg"
+  },
+  {
+   "id": 900007,
+   "pageURL": "http://pixabay.com/photos/plain-http-900007/",
+   "type": "photo",
+   "tags": "<b>bold</b> &amp; tags",
+   "webformatURL": "http://pixabay.com/get/aa900007_640.jpg",
+   "largeImageURL": "http://pixabay.com/get/bb900007_1280.jpg",
+   "user": null,
+   "user_id": null
+  },
+  {
+   "id": 900008,
+   "pageURL": "https://pixabay.com/photos/no-user-900008/",
+   "type": "film",
+   "tags": null,
+   "webformatURL": "https://pixabay.com/get/aa900008_640.jpg"
+  }
+ ]
+}

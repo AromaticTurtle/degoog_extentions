@@ -16,6 +16,9 @@ In degoog: **Settings > Store > Add repository**, paste `https://github.com/Arom
 | [OpenAlex](engines/openalex/README.md) | engine | Scholarly works on a **Scholar** tab. Works without a key; stops when the daily budget is spent. |
 | [CORE](engines/core/README.md) | engine | Open access papers on the same **Scholar** tab. Needs a free API key. |
 | [Unsplash](engines/unsplash/README.md) | engine | Photos on the **Images** tab through the official API. Needs a free API key. |
+| [Pixabay](engines/pixabay/README.md) | engine | Photos, illustrations and vectors on the **Images** tab through the official API. Needs a free API key (kept out of logs and cache keys); 24 h result cache as the terms ask; every result credited to its contributor. |
+| [Openverse](engines/openverse/README.md) | engine | Openly licensed images (Creative Commons, public domain) on the **Images** tab. Works without a key (low anonymous limits, budgets kept on disk); optional client ID and secret for more. Licence and creator shown on every result. |
+| [Pexels](engines/pexels/README.md) | engine | Photos on the **Images** tab through the official API. Needs a free API key (sent in a header); hourly and monthly budgets kept on disk; every result credited to its photographer. |
 | [Reddit Search](engines/reddit-search/README.md) | engine | Reddit posts from Reddit's public Atom feed: relevance sort, subreddit, date, a real excerpt and a thumbnail, paging with `after`. Cached; pauses (never bypasses) when Reddit refuses. A better replacement for the official Reddit engine. |
 | [selfh.st](engines/selfhst/README.md) | engine | The selfh.st self-hosted app directory on an **Apps** tab, with its alternative-to lists. Cached on disk, searched locally. |
 | [selfh.st icons](favicon/selfhst/README.md) | favicon provider | Real app logos from selfh.st/icons for self-hosted software sites. Unknown hosts fall through to the next provider. |

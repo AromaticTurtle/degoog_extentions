@@ -1,0 +1,6 @@
+{
+ "access_token": "INVENTEDTOKEN0123456789abcdef",
+ "scope": "read write",
+ "expires_in": 36000,
+ "token_type": "Bearer"
+}

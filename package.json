@@ -136,6 +136,27 @@
       "minDegoogVersion": "1.1.0"
     },
     {
+      "path": "engines/pixabay",
+      "name": "Pixabay",
+      "description": "Pixabay photos, illustrations and vectors on the Images tab through the official API. Needs a free API key. Results cached 24 hours as the terms ask, every result credited to its contributor.",
+      "version": "1.0.0",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "engines/openverse",
+      "name": "Openverse",
+      "description": "Openly licensed images (Creative Commons and public domain) on the Images tab through the official API. Works without a key; optional client credentials for higher limits. Shows licence and creator.",
+      "version": "1.0.0",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "engines/pexels",
+      "name": "Pexels",
+      "description": "Pexels photos on the Images tab through the official API. Needs a free API key. Hourly and monthly budgets, every result credited to its photographer.",
+      "version": "1.0.0",
+      "minDegoogVersion": "1.1.0"
+    },
+    {
       "path": "engines/selfhst",
       "name": "selfh.st",
       "description": "Search the selfh.st self-hosted app directory on an Apps tab, including its alternative-to lists. Downloads the list once, caches it on disk and searches locally.",
