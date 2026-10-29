@@ -75,6 +75,14 @@
       "version": "1.0.0",
       "type": "slot",
       "minDegoogVersion": "1.1.0"
+    },
+    {
+      "path": "plugins/sports",
+      "name": "Sports scores (ESPN)",
+      "description": "Live score card for 'panthers score', 'did the lakers win', 'arsenal match', 'nfl scores': NFL, NBA, MLB, NHL, MLS, Premier League, WNBA and NCAA football/basketball from ESPN's public (unofficial, keyless) scoreboard. Never answers a bare team name. Inline (detailed) or panel (compact), refreshes while a game is live. Bang: !score.",
+      "version": "1.0.0",
+      "type": "slot",
+      "minDegoogVersion": "1.1.0"
     }
   ],
   "engines": [

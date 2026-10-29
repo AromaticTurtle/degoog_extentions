@@ -28,6 +28,30 @@ In degoog: **Settings > Store > Add repository**, paste `https://github.com/Arom
 | [Reddit lens](plugins/reddit-lens/README.md) | interceptor | `best homelab os reddit`, `reddit best homelab os`, `!reddit ...` and `r/homelab ...` become a `site:reddit.com` search, so your normal web engines return Reddit pages with their own titles, snippets and dates. Makes no request itself. |
 | [Stocks (Finnhub)](plugins/stocks/README.md) | slot plugin | A stock quote card for `AAPL stock`, `$AAPL`, `apple stock price` and (optionally) a bare ticker: price, change, market status, day and 52-week ranges, statistics, sparkline when available. Needs a free Finnhub API key (US stocks on the free plan), sent only in a header. Inline or panel. |
 | [Weather](plugins/weather/README.md) | slot plugin | `weather in Paris`, `forecast`, `is it raining in Seattle`: current conditions, a 24-hour strip, a 7-day forecast and air quality from Open-Meteo (no key). Understands `paris texas`. Inline or panel. Replaces the official weather plugin. |
+| [Sports scores (ESPN)](plugins/sports/README.md) | slot plugin | `panthers score`, `did the lakers win`, `arsenal match`, `nfl scores`: a live score card (clock, line score, venue, next and last game) or a league scoreboard from ESPN's public, **unofficial**, keyless scoreboard JSON. Never answers a bare team name. Refreshes by itself while a game is live. Inline or panel. |
+
+## Core plugins
+
+Six slot plugins answer the questions a search page used to send you elsewhere for. They share one look (a small uppercase kicker, a
+large value, muted details, the same chips, bars and footer), one `Layout` setting (**inline**: the detailed card above the results,
+or **panel**: the compact card in the side column), the same pause, cache and daily-limit habits, and a `debugMatching` setting that
+explains in the log why a card did or did not show.
+
+| Plugin | Triggers on | Data |
+|---|---|---|
+| Calculator | `2+2`, `15% of 80`, `5 km to miles`, `255 in hex` | none (own parser) |
+| Currency | `100 usd to eur`, `bitcoin price` | open.er-api.com, Coinbase |
+| Dictionary | `define serendipity`, `serendipity meaning` | Free Dictionary API |
+| Weather | `weather in paris`, `is it raining in seattle` | Open-Meteo |
+| Stocks | `AAPL stock`, `$AAPL`, `apple stock price` | Finnhub (free key) |
+| Sports | `panthers score`, `nfl scores` | ESPN (unofficial) |
+
+Each query belongs to at most one of them: `tests/domain-routing.test.js` holds a table of about 150 queries and the plugin that
+should take each (`panthers score` is sports only, `lakers` nobody, `define score` the dictionary, `100 usd` currency and not the
+calculator, `chicken stock` nobody...).
+
+**Disable the official degoog weather, define and math plugins** (Settings > Plugins) when you install the matching ones here:
+otherwise two cards answer the same query.
 
 ## Planned
 

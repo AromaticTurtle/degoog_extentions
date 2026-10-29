@@ -1,0 +1,62 @@
+// Nicknames people really type that are not in ESPN's names. Each value is a list of "<league key>:<ESPN display name>"; a nickname
+// that exists in several leagues lists them all (the ranking then picks by game state). Keep it modest: the real names, the
+// nicknames ("panthers") and the full names ("carolina panthers") already resolve without an entry.
+export const ALIASES = {
+  // Premier League
+  "man utd": ["epl:Manchester United"],
+  "man united": ["epl:Manchester United"],
+  "man u": ["epl:Manchester United"],
+  "manchester utd": ["epl:Manchester United"],
+  "red devils": ["epl:Manchester United"],
+  "man city": ["epl:Manchester City"],
+  citizens: ["epl:Manchester City"],
+  spurs: ["epl:Tottenham Hotspur", "nba:San Antonio Spurs"],
+  tottenham: ["epl:Tottenham Hotspur"],
+  gunners: ["epl:Arsenal"],
+  villa: ["epl:Aston Villa"],
+  wolves: ["epl:Wolverhampton Wanderers", "nba:Minnesota Timberwolves"],
+  forest: ["epl:Nottingham Forest"],
+  palace: ["epl:Crystal Palace"],
+  newcastle: ["epl:Newcastle United"],
+  "west ham": ["epl:West Ham United"],
+  brighton: ["epl:Brighton & Hove Albion"],
+  // NFL
+  niners: ["nfl:San Francisco 49ers"],
+  pats: ["nfl:New England Patriots"],
+  bucs: ["nfl:Tampa Bay Buccaneers", "mlb:Pittsburgh Pirates"],
+  fins: ["nfl:Miami Dolphins"],
+  pack: ["nfl:Green Bay Packers"],
+  boys: ["nfl:Dallas Cowboys"],
+  "da bears": ["nfl:Chicago Bears"],
+  // NBA
+  cavs: ["nba:Cleveland Cavaliers"],
+  sixers: ["nba:Philadelphia 76ers"],
+  mavs: ["nba:Dallas Mavericks"],
+  blazers: ["nba:Portland Trail Blazers"],
+  dubs: ["nba:Golden State Warriors"],
+  grizz: ["nba:Memphis Grizzlies"],
+  pels: ["nba:New Orleans Pelicans"],
+  clips: ["nba:LA Clippers"],
+  "t wolves": ["nba:Minnesota Timberwolves"],
+  twolves: ["nba:Minnesota Timberwolves"],
+  // MLB
+  yanks: ["mlb:New York Yankees"],
+  sox: ["mlb:Boston Red Sox", "mlb:Chicago White Sox"],
+  cards: ["mlb:St. Louis Cardinals", "nfl:Arizona Cardinals"],
+  jays: ["mlb:Toronto Blue Jays"],
+  stros: ["mlb:Houston Astros"],
+  // NHL
+  habs: ["nhl:Montreal Canadiens"],
+  leafs: ["nhl:Toronto Maple Leafs"],
+  pens: ["nhl:Pittsburgh Penguins"],
+  caps: ["nhl:Washington Capitals"],
+  bolts: ["nhl:Tampa Bay Lightning"],
+  isles: ["nhl:New York Islanders"],
+  preds: ["nhl:Nashville Predators"],
+  "wings": ["nhl:Detroit Red Wings"],
+  // MLS
+  lafc: ["mls:Los Angeles FC"],
+  nycfc: ["mls:New York City FC"],
+  "inter miami": ["mls:Inter Miami CF"],
+  "la galaxy": ["mls:LA Galaxy"],
+};
