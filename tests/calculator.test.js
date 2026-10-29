@@ -5,7 +5,7 @@ import { fractionHint, formatValue, prettyExpression, radixForms, toBase } from 
 import { analyse } from "../plugins/calculator/match.js";
 import { buildCard } from "../plugins/calculator/render.js";
 import { SETTINGS_SCHEMA } from "../plugins/calculator/settings.js";
-import { CalculatorSlot, INLINE_POSITION, PANEL_POSITION, angleFrom, command, digitsFrom, layoutFrom, slot as sharedSlot } from "../plugins/calculator/index.js";
+import { CalculatorSlot, INLINE_POSITION, PANEL_POSITION, angleFrom, digitsFrom, layoutFrom, slot as sharedSlot } from "../plugins/calculator/index.js";
 import { convertValue, findUnit } from "../plugins/calculator/units.js";
 
 const calc = (text, angle = "radians", digits = 12) => {
@@ -415,21 +415,11 @@ describe("debugMatching", () => {
   });
 });
 
-describe("bang command", () => {
-  afterEach(() => sharedSlot.configure({}));
-  test("renders the same card", async () => {
-    const result = await command.execute("15% of 80");
-    expect(result.html).toContain("calculator-card");
-    expect(result.html).toContain("calculator-rows");
-    const argv = await command.execute(["5", "km", "to", "miles"]);
-    expect(argv.html).toContain("calculator-grid");
-  });
-  test("a usage hint for nonsense", async () => {
-    const result = await command.execute("hello");
-    expect(result.html).toContain("!calc");
-  });
-  test("is a valid command shape", () => {
-    expect(command.trigger).toBe("calc");
-    expect(typeof command.execute).toBe("function");
+describe("one menu entry", () => {
+  test("the module exports a slot and no bang command (a command would add a second entry to degoog's plugin list)", async () => {
+    const mod = await import("../plugins/calculator/index.js");
+    expect(mod.slot).toBe(sharedSlot);
+    expect("command" in mod).toBe(false);
+    expect("default" in mod).toBe(false);
   });
 });

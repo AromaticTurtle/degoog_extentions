@@ -1,3 +1,5 @@
+import { CRYPTO_ALIASES, FIAT_ALIASES } from "./aliases.js";
+
 // Currency data: the ISO 4217 codes that open.er-api.com serves, names and aliases, symbols, and a starter list of crypto
 // currencies on Coinbase (the live list from Coinbase extends it once it has been fetched).
 
@@ -10,14 +12,14 @@ export const FIAT_CODES = new Set(
 export const WORDLIKE_FIAT = new Set(["ALL", "TRY", "COP", "CUP", "GEL", "MAD", "MOP", "PEN", "RUB", "SOS", "TOP", "KID", "BOB", "RON", "ANG", "FOK", "MUR", "ARS", "LAK", "ERN", "SAR", "SEK", "TND", "NAD"]);
 
 // Names that mean a currency but are also ordinary words ("won", "real", "pound", "lei", "sol"...).
-export const WORDLIKE_NAMES = new Set(["won", "real", "pound", "lei", "leu", "rand", "lira", "mark", "kip", "lek", "dram", "som", "kiwi", "aussie", "colon", "dong"]);
+export const WORDLIKE_NAMES = new Set(["won", "real", "pound", "lei", "leu", "rand", "lira", "mark", "kip", "lek", "dram", "som", "kiwi", "aussie", "colon", "dong", "kina", "tala", "pula", "dobra", "loti", "lari", "manat", "leone", "denar", "lev", "birr", "kyat", "riel", "tenge", "piso", "convertible mark"]);
 
 // "dollar" is resolved with the dollarMeans setting.
 export const DOLLAR = "$";
 
 const entries = (code, ...names) => names.map((name) => [name, code]);
 
-export const FIAT_NAMES = new Map([
+const BASE_FIAT_NAMES = [
   ...entries(DOLLAR, "dollar", "buck", "greenback"),
   ...entries("USD", "us dollar", "u.s. dollar", "american dollar", "united states dollar", "usa dollar"),
   ...entries("EUR", "euro"),
@@ -124,10 +126,13 @@ export const FIAT_NAMES = new Map([
   ...entries("BSD", "bahamian dollar"),
   ...entries("BND", "brunei dollar"),
   ...entries("LRD", "liberian dollar"),
-]);
+];
+
+// The base table wins over the extra aliases when a name appears in both.
+export const FIAT_NAMES = new Map([...Object.entries(FIAT_ALIASES).flatMap(([code, names]) => entries(code, ...names)), ...BASE_FIAT_NAMES]);
 
 // Plural forms that are not simply "+s"
-export const IRREGULAR_PLURALS = new Map([["reais", "real"], ["kronor", "krona"], ["kroner", "krone"], ["lire", "lira"], ["leva", "lev"], ["lei", "leu"], ["pounds sterling", "pound sterling"]]);
+export const IRREGULAR_PLURALS = new Map([["reais", "real"], ["kronor", "krona"], ["kroner", "krone"], ["lire", "lira"], ["leva", "lev"], ["lei", "leu"], ["pounds sterling", "pound sterling"], ["brazilian reais", "brazilian real"], ["soles", "sol"], ["rubles", "ruble"], ["leones", "leone"], ["lire", "lira"]]);
 
 // Currency symbols. "$" follows the dollarMeans setting; "¥" is the yen (the yuan uses the same sign).
 export const SYMBOLS = new Map([
@@ -148,12 +153,13 @@ export const STARTER_CRYPTO = new Map(
   }),
 );
 
-export const CRYPTO_NAMES = new Map([
+const BASE_CRYPTO_NAMES = [
   ["bitcoin", "BTC"], ["ethereum", "ETH"], ["ether", "ETH"], ["solana", "SOL"], ["dogecoin", "DOGE"], ["ripple", "XRP"], ["litecoin", "LTC"],
   ["cardano", "ADA"], ["tether", "USDT"], ["usd coin", "USDC"], ["bitcoin cash", "BCH"], ["stellar", "XLM"], ["stellar lumens", "XLM"], ["avalanche", "AVAX"],
   ["polygon", "POL"], ["polkadot", "DOT"], ["chainlink", "LINK"], ["shiba inu", "SHIB"], ["uniswap", "UNI"], ["cosmos", "ATOM"], ["ethereum classic", "ETC"],
   ["tron", "TRX"], ["algorand", "ALGO"], ["filecoin", "FIL"], ["aptos", "APT"], ["arbitrum", "ARB"], ["hedera", "HBAR"], ["zcash", "ZEC"], ["tezos", "XTZ"],
-]);
+];
+export const CRYPTO_NAMES = new Map([...Object.entries(CRYPTO_ALIASES).flatMap(([code, names]) => entries(code, ...names)), ...BASE_CRYPTO_NAMES]);
 
 // Crypto codes that may be used on their own ("btc") or after "price of".
 export const BARE_CRYPTO = new Set(["BTC", "ETH", "XRP", "DOGE", "LTC"]);

@@ -5,11 +5,19 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { AudioProxy, MAX_BYTES } from "../plugins/dictionary/audio.js";
-import { lemmaOf, parseQuery } from "../plugins/dictionary/match.js";
+import { BARE_STOPLIST, CURRENCY_CODES, DEFER } from "../plugins/dictionary/bare-lists.js";
+import { bareWord, lemmaOf, parseQuery } from "../plugins/dictionary/match.js";
+import { CalculatorSlot } from "../plugins/calculator/index.js";
+import { CurrencySlot } from "../plugins/currency/index.js";
+import { FIAT_CODES, WORDLIKE_FIAT } from "../plugins/currency/currencies.js";
+import { SportsSlot } from "../plugins/sports/index.js";
+import { WELL_KNOWN } from "../plugins/stocks/stoplist.js";
+import { StocksSlot } from "../plugins/stocks/index.js";
+import { WeatherSlot } from "../plugins/weather/index.js";
 import { accentOf, compactEntries, safeUrl } from "../plugins/dictionary/shape.js";
 import { audioSource, buildCard } from "../plugins/dictionary/render.js";
 import { SETTINGS_SCHEMA } from "../plugins/dictionary/settings.js";
-import { DictionarySlot, slot as sharedSlot, ENTRY_TTL_MS, INLINE_POSITION, MISSING_TTL_MS, PANEL_POSITION, USER_AGENT, audioFrom, command, layoutFrom, maxMeaningsFrom, routes } from "../plugins/dictionary/index.js";
+import { DictionarySlot, slot as sharedSlot, ENTRY_TTL_MS, INLINE_POSITION, MISSING_TTL_MS, PANEL_POSITION, USER_AGENT, audioFrom, layoutFrom, maxMeaningsFrom, routes } from "../plugins/dictionary/index.js";
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
 const FLORBIT = fixture("dictionary-florbit.json");
@@ -114,7 +122,7 @@ describe("which queries are dictionary questions", () => {
   }
 
   const negatives = [
-    "", " ", "serendipity", "happy", "dog", "define", "definition", "meaning", "synonyms", "what is serendipity", "what does mean", "define 5", "define 2+2", "define c++",
+    "", " ", "define", "definition", "meaning", "synonyms", "what is serendipity", "what does mean", "define 5", "define 2+2", "define c++",
     "define the term in c++ programming language", "define one two three four", "serendipity means", "meaning of", "how to pronounce", "the definition", "synonyms for", "what is the meaning",
     "definition of the", "define the", "define a", "https://example.com define", "me@example.com meaning", "weather meaning 10", "x".repeat(200), "define " + "a".repeat(60),
     "legal definition of murder", "meaning of life in the movie", "pronunciation of 12", "dictionary", "define 123abc",
@@ -123,6 +131,10 @@ describe("which queries are dictionary questions", () => {
 
   test("calculator, currency and weather style queries are left alone", () => {
     for (const query of ["2+2", "100 usd to eur", "5 km to miles", "btc", "weather paris", "15% of 80"]) expect(wordOf(query), query).toBeNull();
+  });
+
+  test("without the bare-word option a lone word never triggers", () => {
+    for (const query of ["serendipity", "happy", "dog", "colloquial"]) expect(wordOf(query), query).toBeNull();
   });
 
   test("a rejection gives a reason", () => {
@@ -487,8 +499,9 @@ describe("lookups", () => {
   test("not a dictionary question: no request, empty result; never throws", async () => {
     const w = world();
     const slot = makeSlot();
-    expect(await slot.execute("florbit", ctx(w))).toEqual({ title: "", html: "" });
-    expect(w.calls).toHaveLength(0);
+    expect(await slot.execute("two words florbit", ctx(w))).toEqual({ title: "", html: "" });
+    expect(await slot.execute("florbit", { fetch: w.fetch })).not.toEqual({ title: "", html: "" }); // a bare word is looked up by default
+    expect(w.calls).toHaveLength(1);
     await capture(async () => {
       for (const query of [null, undefined, "", "define florbit"]) {
         expect(await slot.execute(query, { fetch: async () => { throw new Error("x"); } })).toBeDefined();
@@ -610,7 +623,7 @@ describe("layout and settings", () => {
   });
 
   test("the schema", () => {
-    expect(SETTINGS_SCHEMA.map((f) => f.key)).toEqual(["layout", "maxMeanings", "showExamples", "showSynonyms", "audio", "dailyRequestLimit", "debugMatching"]);
+    expect(SETTINGS_SCHEMA.map((f) => f.key)).toEqual(["layout", "maxMeanings", "showExamples", "showSynonyms", "triggerOnBareWord", "audio", "dailyRequestLimit", "debugMatching"]);
     expect(SETTINGS_SCHEMA.find((f) => f.key === "layout")).toMatchObject({ default: "inline", options: ["inline", "panel"] });
     expect(SETTINGS_SCHEMA.find((f) => f.key === "audio")).toMatchObject({ default: "proxy", options: ["proxy", "direct", "off"] });
     expect(SETTINGS_SCHEMA.find((f) => f.key === "dailyRequestLimit")).toMatchObject({ default: "500", advanced: true });
@@ -651,17 +664,235 @@ describe("debugMatching", () => {
   });
 });
 
-describe("the bang command", () => {
-  afterEach(() => {});
-  test("renders the same card", async () => {
-    sharedSlot.spacingMs = 0;
-    sharedSlot.budget.file = "";
+describe("one menu entry", () => {
+  test("the module exports a slot and no bang command (a command would add a second entry to degoog's plugin list)", async () => {
+    const mod = await import("../plugins/dictionary/index.js");
+    expect(mod.slot).toBe(sharedSlot);
+    expect("command" in mod).toBe(false);
+    expect("default" in mod).toBe(false);
+  });
+});
+
+// ------------------------------------------------------------------------------------------------------------------------
+describe("bare words", () => {
+  const bare = (query) => parseQuery(query, { bareWord: true });
+  const wordsOf = (query) => bare(query).parsed?.word ?? null;
+
+  test("a lone word is defined: lower case or capitalised, with an inner hyphen or apostrophe", () => {
+    for (const [query, word] of [["colloquial", "colloquial"], ["Colloquial", "colloquial"], ["ephemeral", "ephemeral"], ["serendipity", "serendipity"], ["well-known", "well-known"], ["don't", "don't"], ["rock'n'roll", "rock'n'roll"], ["colloquialisms", "colloquialisms"], ["colloquial?", "colloquial"], ["  colloquial  ", "colloquial"], ["python", "python"], ["top", "top"], ["cat", "cat"], ["Quillfern", "quillfern"]]) {
+      expect(wordsOf(query), query).toBe(word);
+      expect(bare(query).parsed.intent).toBe("define");
+      expect(bare(query).bare).toBe("lookup");
+    }
+  });
+
+  test("length: 3 to 30 letters (shorter words only through explicit forms)", () => {
+    for (const query of ["a", "ab", "go", "x".repeat(31)]) expect(wordsOf(query), query).toBeNull();
+    expect(wordsOf("abc")).toBe("abc");
+    expect(wordsOf("a".repeat(30))).toBe("a".repeat(30));
+    expect(parseQuery("define go", { bareWord: true }).parsed.word).toBe("go");
+    expect(bare("ab").reason).toContain("shorter than 3");
+    expect(bare("x".repeat(31)).reason).toContain("longer than 30");
+  });
+
+  test("not words: digits, URLs, dots, slashes, @, symbols, several words", () => {
+    for (const query of ["12345", "abc123", "x.com", "example.com", "a/b", "me@example.com", "http://x", "c++", "$AAPL", "!weather", "100%", "two words", "colloquial word", "hello_world", "tab\tbed", "-dash", "dash-", "'quote", "e-mail-", "..."]) {
+      expect(wordsOf(query), query).toBeNull();
+    }
+  });
+
+  test("capitals: an all-caps token or a mixed-case name is not a word", () => {
+    for (const query of ["AAPL", "NASA", "HTML", "iPhone", "McDonald", "eBay"]) expect(wordsOf(query), query).toBeNull();
+    expect(bare("NASA").reason).toContain("all capitals");
+    expect(bare("iPhone").reason).toContain("mixed capitals");
+  });
+
+  test("popular sites and brands are skipped (stoplist)", () => {
+    for (const query of ["google", "youtube", "facebook", "reddit", "amazon", "gmail", "login", "Google", "netflix", "github"]) {
+      expect(wordsOf(query), query).toBeNull();
+      expect(bare(query).reason).toContain("stoplist");
+    }
+  });
+
+  test("stop words are skipped", () => {
+    for (const query of ["the", "and", "meaning", "definition", "dictionary", "word", "synonyms"]) expect(wordsOf(query), query).toBeNull();
+  });
+
+  test("words another core plugin answers are left to it", () => {
+    for (const [query, plugin] of [["weather", "weather"], ["forecast", "weather"], ["Weather", "weather"], ["score", "sports"], ["scores", "sports"], ["tau", "calculator"], ["sqrt", "calculator"], ["bitcoin", "currency"], ["btc", "currency"], ["doge", "currency"], ["ethereum", "currency"], ["msft", "stocks"], ["aapl", "stocks"], ["Tsla", "stocks"], ["meta", "stocks"]]) {
+      expect(wordsOf(query), query).toBeNull();
+      expect(bare(query).reason, query).toContain(plugin);
+    }
+  });
+
+  test("currency codes are not words", () => {
+    for (const query of ["usd", "eur", "gbp", "jpy", "USD", "Eur"]) expect(wordsOf(query), query).toBeNull();
+    // codes that are also English words stay definable
+    for (const query of ["top", "pen", "cup", "mad", "try", "all", "kid", "cop"]) expect(wordsOf(query), query).toBe(query);
+  });
+
+  test("explicit forms win and keep their meaning", () => {
+    expect(bare("define score").parsed).toMatchObject({ word: "score", intent: "define" });
+    expect(bare("score meaning").parsed).toMatchObject({ word: "score", intent: "define" });
+    expect(bare("define weather").parsed.word).toBe("weather");
+    expect(bare("synonyms for happy").parsed.intent).toBe("synonyms");
+    expect(bare("define score").bare).toBeUndefined();
+  });
+
+  test("queries that are neither explicit nor a lone word still give a reason", () => {
+    expect(bare("what is serendipity").reason).toContain("bare word skipped: more than one word");
+    expect(bare("").reason).toBe("empty");
+  });
+
+  test("bareWord() on odd input never throws", () => {
+    for (const query of [null, undefined, 5, {}, [], "\u0000", "💥", "é".repeat(40), "a".repeat(5000)]) expect(() => bareWord(query)).not.toThrow();
+  });
+
+  describe("the lists stay in step with the plugins that own those words", () => {
+    const quiet = (slot) => slot;
+    const weather = new WeatherSlot();
+    weather.configure({});
+    const sports = new SportsSlot();
+    sports.configure({});
+    const calculator = new CalculatorSlot();
+    calculator.configure({});
+    const currency = new CurrencySlot();
+    currency.configure({});
+    const stocks = new StocksSlot();
+    stocks.store.file = "";
+    stocks.configure({ apiKey: "test-key-0123456789" });
+    quiet(weather);
+
+    test("every deferred word is really claimed by that plugin, or is a word it must own", () => {
+      for (const word of DEFER.weather) if (["weather", "forecast"].includes(word)) expect(weather.trigger(word), word).toBe(true);
+      for (const word of DEFER.currency) if (["bitcoin", "btc", "ethereum", "eth", "ether", "xrp", "doge", "dogecoin", "ltc", "litecoin"].includes(word)) expect(currency.trigger(word), word).toBe(true);
+      for (const word of DEFER.stocks) expect(stocks.trigger(word), word).toBe(true);
+    });
+
+    test("the stock allowlist (three letters or more) is deferred in full", () => {
+      for (const symbol of WELL_KNOWN) {
+        if (symbol.length < 3 || symbol.includes(".")) continue;
+        expect(DEFER.stocks.has(symbol.toLowerCase()), symbol).toBe(true);
+      }
+    });
+
+    test("no bare word is claimed by the dictionary and by another plugin at the same time", () => {
+      const slot = new DictionarySlot();
+      slot.configure({});
+      const pool = new Set(["colloquial", "ephemeral", "weather", "forecast", "score", "scores", "pi", "bitcoin", "btc", "eth", "ether", "msft", "aapl", "meta", "usd", "eur", "top", "pen", "serendipity", "euro", "dollar", "pound", "stock", "stocks", "temperature", "calculator", ...DEFER.weather, ...DEFER.sports, ...DEFER.calculator, ...DEFER.currency, ...DEFER.stocks, ...BARE_STOPLIST]);
+      for (const word of pool) {
+        for (const form of [word, word.toUpperCase(), word[0].toUpperCase() + word.slice(1)]) {
+          const takers = [weather, sports, calculator, currency, stocks].filter((other) => other.trigger(form));
+          if (slot.trigger(form)) expect(takers.map((t) => t.id), form).toEqual([]);
+        }
+      }
+    });
+
+    test("the currency codes: every code the currency plugin knows is skipped, except the ones that are English words", () => {
+      for (const code of FIAT_CODES) expect(CURRENCY_CODES.has(code.toLowerCase()), code).toBe(!WORDLIKE_FIAT.has(code));
+      for (const code of CURRENCY_CODES) expect(FIAT_CODES.has(code.toUpperCase()), code).toBe(true);
+    });
+
+    test("the stoplist never overlaps the deferral lists and holds only lower-case words", () => {
+      for (const word of BARE_STOPLIST) {
+        expect(word, word).toBe(word.toLowerCase());
+        for (const words of Object.values(DEFER)) expect(words.has(word), word).toBe(false);
+      }
+      expect(BARE_STOPLIST.size).toBeGreaterThan(30);
+      expect(BARE_STOPLIST.size).toBeLessThan(120);
+    });
+  });
+});
+
+describe("bare words: the slot", () => {
+  const ctx = (w) => ({ fetch: w.fetch });
+
+  test("on by default: a lone word is looked up and shows the card", async () => {
     const w = world();
-    const result = await command.execute("florbit", { fetch: w.fetch });
+    const slot = makeSlot();
+    expect(slot.triggerOnBareWord).toBe(true);
+    expect(slot.trigger("florbit")).toBe(true);
+    const result = await slot.execute("florbit", ctx(w));
     expect(result.html).toContain("dictionary-card");
-    expect(command.trigger).toBe("define");
-    expect(typeof command.execute).toBe("function");
-    expect((await command.execute("", { fetch: w.fetch })).html).toContain("!define");
-    expect((await command.execute(["quillfern"], { fetch: w.fetch })).html).toContain("quillfern");
+    expect(w.calls).toHaveLength(1);
+    expect(w.calls[0].url).toBe("https://api.dictionaryapi.dev/api/v2/entries/en/florbit");
+  });
+
+  test("off: only the explicit forms trigger", async () => {
+    const w = world();
+    const slot = makeSlot({ triggerOnBareWord: "false" });
+    expect(slot.triggerOnBareWord).toBe(false);
+    expect(slot.trigger("florbit")).toBe(false);
+    expect(await slot.execute("florbit", ctx(w))).toEqual({ title: "", html: "" });
+    expect(w.calls).toHaveLength(0);
+    expect(slot.trigger("define florbit")).toBe(true);
+    expect(slot.trigger("florbit meaning")).toBe(true);
+  });
+
+  test("non-words never reach the upstream", async () => {
+    const w = world();
+    const slot = makeSlot();
+    for (const query of ["google", "youtube", "12345", "a", "AAPL", "weather", "score", "x.com", "login", "two words", "usd", "msft"]) {
+      expect(slot.trigger(query), query).toBe(false);
+      expect(await slot.execute(query, ctx(w))).toEqual({ title: "", html: "" });
+    }
+    expect(w.calls).toHaveLength(0);
+  });
+
+  test("an unknown word: one request, then the 24 hour miss cache answers (no more requests)", async () => {
+    const w = world();
+    const time = clock();
+    const slot = makeSlot({}, { time });
+    expect((await slot.execute("zzzzzz", ctx(w))).html).toBe("");
+    const first = w.calls.length;
+    expect(first).toBeGreaterThanOrEqual(1);
+    for (let i = 0; i < 3; i += 1) expect((await slot.execute("zzzzzz", ctx(w))).html).toBe("");
+    expect(w.calls.length).toBe(first);
+    time.state.t += 23 * 3_600_000;
+    await slot.execute("zzzzzz", ctx(w));
+    expect(w.calls.length).toBe(first);
+    time.state.t += 2 * 3_600_000;
+    await slot.execute("zzzzzz", ctx(w));
+    expect(w.calls.length).toBeGreaterThan(first);
+  });
+
+  test("the lemma fallback works for a bare plural", async () => {
+    const w = world();
+    const slot = makeSlot();
+    const result = await slot.execute("quillferns", ctx(w));
+    expect(result.html).toContain("Showing the entry for");
+    expect(result.html).toContain("quillfern");
+  });
+
+  test("the daily budget still caps bare lookups", async () => {
+    const w = world();
+    const slot = makeSlot({ dailyRequestLimit: "1" });
+    await capture(async () => {
+      await slot.execute("florbit", ctx(w));
+      await slot.execute("quillfern", ctx(w));
+    });
+    expect(w.calls).toHaveLength(1);
+  });
+
+  test("debugMatching explains a lookup and a skip, and only for single tokens", async () => {
+    const slot = makeSlot({ debugMatching: "true" });
+    const lines = await capture(async () => {
+      slot.trigger("colloquial");
+      slot.trigger("google");
+      slot.trigger("AAPL");
+      slot.trigger("two words");
+    });
+    expect(lines.some((line) => line.includes('"colloquial" -> bare word: lookup'))).toBe(true);
+    expect(lines.some((line) => line.includes('"google" -> bare word: skipped (a popular site or brand (stoplist))'))).toBe(true);
+    expect(lines.some((line) => line.includes('"AAPL" -> bare word: skipped (all capitals'))).toBe(true);
+    expect(lines.some((line) => line.includes("two words"))).toBe(false);
+    for (const line of lines) expect(line).not.toMatch(/https?:/);
+  });
+
+  test("the setting is a toggle on by default", () => {
+    const field = SETTINGS_SCHEMA.find((f) => f.key === "triggerOnBareWord");
+    expect(field.type).toBe("toggle");
+    expect(field.default).toBe("true");
+    expect(field.description).toContain("Off:");
   });
 });

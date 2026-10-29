@@ -12,10 +12,11 @@ import { aqiCategory, compass, currentHourIndex, dayName, fmtClock, fmtHour, fmt
 import { parseQuery } from "../plugins/weather/match.js";
 import { norm, pickPlace, placeLabel, splitPlace } from "../plugins/weather/places.js";
 import { airUrl, forecastUrl, geocodeUrl, parseAir, parseForecast, parseGeocode } from "../plugins/weather/request.js";
-import { buildCard, buildHint } from "../plugins/weather/render.js";
+import { buildCard, buildPrompt } from "../plugins/weather/render.js";
+import { MAX_QUERY_CHARS, cleanLabel, labelFromTimezone, parseCardRequest, roundCoord, safeApiBase } from "../plugins/weather/location.js";
 import { SETTINGS_SCHEMA } from "../plugins/weather/settings.js";
 import { WMO_CODES, describeCode, iconSvg } from "../plugins/weather/wmo.js";
-import { INLINE_POSITION, PANEL_POSITION, USER_AGENT, WeatherSlot, command, homeFrom, layoutFrom, slot as sharedSlot, unitsFrom } from "../plugins/weather/index.js";
+import { INLINE_POSITION, PANEL_POSITION, USER_AGENT, WeatherSlot, homeFrom, layoutFrom, routes, slot as sharedSlot, unitsFrom } from "../plugins/weather/index.js";
 
 const GEO = JSON.parse(readFileSync(new URL("./fixtures/open-meteo-geocode.json", import.meta.url), "utf8"));
 
@@ -498,10 +499,43 @@ describe("cards", () => {
     expect(panel.length).toBeLessThan(inline.length);
   });
 
-  test("the hint card", () => {
-    const html = buildHint();
-    expect(html).toContain("Set a home location in the Weather plugin settings");
-    expect(html).toContain("weather-card--hint");
+  test("the location prompt card", () => {
+    const html = buildPrompt({ layout: "inline", api: "/api/plugin/weather" });
+    expect(html).toContain("weather-card--prompt");
+    expect(html).toContain("weather-card--inline");
+    expect(html).toContain("Weather · Your location");
+    expect(html).toContain('data-api="/api/plugin/weather/card"');
+    expect(html).toContain("Use my location");
+    expect(html).toMatch(/<button type="button" class="weather-locate" hidden>/);
+    expect(html).toContain('class="weather-input"');
+    expect(html).toContain('class="weather-save"');
+    expect(html).toMatch(/<p class="weather-note" hidden>Browser location needs HTTPS; type a city instead\.<\/p>/);
+    expect(html).toContain('role="status"');
+    expect(html).toMatch(/<div class="weather-loading" hidden>Loading weather…<\/div>/);
+    expect(html).not.toMatch(/\sstyle=/i);
+    expect(html).not.toMatch(/<script|\son[a-z]+=/i);
+    expect(buildPrompt({ layout: "panel" })).toContain("weather-card--panel");
+  });
+
+  test("the prompt can carry a problem, escaped", () => {
+    const html = buildPrompt({ message: 'Couldn\'t find “<b>x</b>”' });
+    expect(html).toContain("weather-prompt-text--problem");
+    expect(html).toContain("&lt;b&gt;x&lt;/b&gt;");
+    expect(html).not.toContain("<b>x</b>");
+  });
+
+  test("a card made for a saved place carries its coordinates and a change link", () => {
+    const d = data();
+    const plain = buildCard(d, { layout: "inline" });
+    expect(plain).not.toContain("data-lat");
+    expect(plain).not.toContain("weather-change");
+    const saved = buildCard({ ...d, place: { lat: 35.23, lon: -80.84 } }, { layout: "inline", changeLink: true });
+    expect(saved).toContain('data-lat="35.23" data-lon="-80.84"');
+    expect(saved).toContain("data-label=");
+    expect(saved).toContain('class="weather-link weather-change"');
+    const panel = buildCard({ ...d, place: { lat: 1, lon: 2 } }, { layout: "panel", changeLink: true });
+    expect(panel).toContain("weather-change");
+    expect(panel).toContain("data-lat");
   });
 
   test("everything is escaped and there are no inline styles or handlers", () => {
@@ -609,14 +643,106 @@ describe("the slot", () => {
     expect(w.calls[0].params.get("name")).toBe("Charlotte");
   });
 
-  test("no home location: a hint for the bare forms, nothing for questions", async () => {
+  test("no home location: the location prompt for the bare forms, nothing for questions", async () => {
     const w = world();
     const slot = makeSlot();
-    expect((await slot.execute("weather", ctx(w))).html).toContain("Set a home location in the Weather plugin settings");
-    expect((await slot.execute("forecast", ctx(w))).html).toContain("Set a home location");
-    expect((await slot.execute("weather near me", ctx(w))).html).toContain("Set a home location");
+    for (const query of ["weather", "forecast", "weather near me"]) {
+      const html = (await slot.execute(query, ctx(w))).html;
+      expect(html, query).toContain("weather-card--prompt");
+      expect(html, query).toContain("Use my location");
+    }
     expect(await slot.execute("is it raining", ctx(w))).toEqual({ title: "", html: "" });
     expect(w.calls).toHaveLength(0);
+  });
+
+  test("the prompt follows the layout and the route address from init()", async () => {
+    const slot = makeSlot({ layout: "panel" });
+    slot.init({ apiBase: "/api/plugin/weather-x", template: '<div class="command-result weather-result">{{content}}</div>' });
+    const html = (await slot.execute("weather", ctx(world()))).html;
+    expect(html).toContain("weather-card--panel");
+    expect(html).toContain('data-api="/api/plugin/weather-x/card"');
+    slot.init({ apiBase: "https://evil.example/x" });
+    expect(slot.apiBase).toBe("/api/plugin/weather-x");
+  });
+
+  test("a home location that cannot be found is said, not silent", async () => {
+    const w = world();
+    const slot = makeSlot({ homeLocation: "Zzzzville, Qq" });
+    const html = (await slot.execute("weather", ctx(w))).html;
+    expect(html).toContain("weather-prompt-text--problem");
+    expect(html).toContain("Couldn&#39;t find “Zzzzville, Qq”");
+    expect(html).toContain("Home location setting");
+    expect(w.count("forecast")).toBe(0);
+  });
+
+  test("a home location with the geocoder down says so, and tries again later (nothing is cached)", async () => {
+    const time = clock();
+    const boom = world({ geo: () => new Response("", { status: 503 }) });
+    const slot = makeSlot({ homeLocation: "Charlotte, NC" }, { time });
+    let html = "";
+    await capture(async () => {
+      html = (await slot.execute("weather", ctx(boom))).html;
+    });
+    expect(html).toContain("isn&#39;t available right now");
+    time.state.t += 61_000;
+    expect((await slot.execute("weather", ctx(world()))).html).toContain("Weather · Charlotte, North Carolina");
+  });
+
+  test("a home location whose forecast fails says so", async () => {
+    const slot = makeSlot({ homeLocation: "Charlotte, NC" });
+    let html = "";
+    await capture(async () => {
+      html = (await slot.execute("weather", ctx(world({ forecast: () => new Response("", { status: 500 }) })))).html;
+    });
+    expect(html).toContain("weather-prompt-text--problem");
+  });
+
+  describe("home location formats", () => {
+    for (const home of ["Charlotte, NC", "Charlotte, North Carolina", "Charlotte NC", "charlotte nc", "Charlotte", "Charlotte, NC, USA", "Charlotte, North Carolina, United States", "Charlotte, NC 28202", "Charlotte NC 28202", "  Charlotte ,  NC  "]) {
+      test(`${JSON.stringify(home)}`, async () => {
+        const w = world();
+        const slot = makeSlot({ homeLocation: home });
+        const html = (await slot.execute("weather", ctx(w))).html;
+        expect(html).toContain("Weather · Charlotte, North Carolina, United States");
+        expect(w.calls[0].params.get("name").toLowerCase()).toBe("charlotte");
+      });
+    }
+
+    test("the same formats with a state that is not the biggest Charlotte", async () => {
+      for (const home of ["Charlotte, Michigan", "Charlotte, MI", "Charlotte MI", "Charlotte, MI, USA"]) {
+        const html = (await makeSlot({ homeLocation: home }).execute("weather", ctx(world()))).html;
+        expect(html, home).toContain("Charlotte, Michigan, United States");
+      }
+    });
+
+    test("a home location that is stored as a different lower case and spacing shares the cache", async () => {
+      const w = world();
+      const slot = makeSlot({ homeLocation: "Charlotte, NC" });
+      await slot.execute("weather", ctx(w));
+      slot.configure({ homeLocation: "  charlotte,   nc " });
+      await slot.execute("weather", ctx(w));
+      expect(w.count("geo")).toBe(1);
+    });
+
+    test("changing the home location takes effect on the next search (no stale miss)", async () => {
+      const w = world();
+      const slot = makeSlot({ homeLocation: "Zzzzville" });
+      expect((await slot.execute("weather", ctx(w))).html).toContain("Couldn&#39;t find");
+      slot.configure({ homeLocation: "Charlotte, NC" });
+      expect((await slot.execute("weather", ctx(w))).html).toContain("Weather · Charlotte, North Carolina");
+      slot.configure({ homeLocation: "" });
+      expect((await slot.execute("weather", ctx(w))).html).toContain("weather-card--prompt");
+    });
+
+    test("splitPlace on the longer forms", () => {
+      expect(splitPlace("Charlotte, NC, USA")).toMatchObject({ name: "Charlotte", hint: "NC", kind: "region" });
+      expect(splitPlace("Paris, Texas, United States")).toMatchObject({ name: "Paris", hint: "Texas", kind: "region" });
+      expect(splitPlace("Charlotte, NC 28202")).toMatchObject({ name: "Charlotte", hint: "NC" });
+      expect(splitPlace("Charlotte NC 28202")).toMatchObject({ name: "Charlotte", hint: "NC" });
+      expect(splitPlace("28202")).toMatchObject({ name: "28202", hint: "" });
+      expect(splitPlace("Charlotte,")).toMatchObject({ name: "Charlotte", hint: "" });
+      expect(splitPlace("Springfield, Illinois")).toMatchObject({ name: "Springfield", hint: "Illinois", kind: "region" });
+    });
   });
 
   test("an unknown place gives no card, and the miss is remembered", async () => {
@@ -801,15 +927,300 @@ describe("debugMatching", () => {
   });
 });
 
-describe("the bang command", () => {
-  test("renders the same card", async () => {
-    sharedSlot.spacingMs = 0;
-    sharedSlot.budget.file = "";
+describe("one menu entry", () => {
+  test("the module exports a slot and no bang command (a command would add a second entry to degoog's plugin list)", async () => {
+    const mod = await import("../plugins/weather/index.js");
+    expect(mod.slot).toBe(sharedSlot);
+    expect("command" in mod).toBe(false);
+    expect("default" in mod).toBe(false);
+  });
+});
+
+// ------------------------------------------------------------------------------------------------------------------------
+describe("the card route (use my location)", () => {
+  const TEMPLATE = '<div class="command-result weather-result">{{content}}</div>';
+  const setup = (settings = {}, overrides = {}, { time } = {}) => {
+    const w = world(overrides);
+    const slot = makeSlot(settings, { time });
+    slot.init({ apiBase: "/api/plugin/weather", template: TEMPLATE, fetch: w.fetch });
+    return { w, slot };
+  };
+  const get = (slot, query) => slot.serveCard(new Request(`http://degoog.test/api/plugin/weather/card?${query}`));
+
+  test("is a GET route at /card under the plugin's address, rate limited", () => {
+    expect(routes).toHaveLength(1);
+    expect(routes[0]).toMatchObject({ method: "get", path: "/card", rateLimit: true });
+    expect(typeof routes[0].handler).toBe("function");
+  });
+
+  test("coordinates: the same card as the slot, html, never cached by the browser", async () => {
+    const { w, slot } = setup();
+    const response = await get(slot, "lat=35.2271&lon=-80.8431");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    const html = await response.text();
+    expect(html).toContain('<div class="command-result weather-result">');
+    expect(html).toContain("weather-card--inline");
+    expect(html).toContain('data-lat="35.23" data-lon="-80.84"');
+    expect(html).toContain("weather-change");
+    expect(w.count("geo")).toBe(0);
+    expect(w.count("forecast")).toBe(1);
+    expect(w.count("air")).toBe(1);
+    // coordinates are rounded to 2 decimals before they leave the server too
+    expect(w.calls.find((c) => c.path === "/v1/forecast").params.get("latitude")).toBe("35.23");
+    expect(w.calls.find((c) => c.path === "/v1/forecast").params.get("longitude")).toBe("-80.84");
+  });
+
+  test("with no label the city comes from the forecast's time zone; 'Your location' when there is none", async () => {
+    const { slot } = setup();
+    expect(await (await get(slot, "lat=48.85&lon=2.35")).text()).toContain("Weather · Paris");
+    const noCity = setup({}, { forecast: (u) => new Response(JSON.stringify(buildForecast({ timezone: "UTC", system: "imperial" })), { status: 200 }) });
+    expect(await (await get(noCity.slot, "lat=10&lon=10")).text()).toContain("Weather · Your location");
+  });
+
+  test("a label from the browser is used, cleaned and capped", async () => {
+    const { slot } = setup();
+    const html = await (await get(slot, `lat=1&lon=2&label=${encodeURIComponent("<b>Charlotte</b>, NC")}`)).text();
+    expect(html).toContain("Weather · b Charlotte /b , NC");
+    expect(html).not.toContain("<b>Charlotte");
+    const long = await (await get(setup().slot, `lat=1&lon=2&label=${"x".repeat(200)}`)).text();
+    expect(long).toContain(`Weather · ${"x".repeat(60)}<`);
+  });
+
+  test("a typed place is resolved with the usual disambiguation and returned with its coordinates", async () => {
+    const { w, slot } = setup();
+    const html = await (await get(slot, `q=${encodeURIComponent("Charlotte, NC")}`)).text();
+    expect(html).toContain("Weather · Charlotte, North Carolina, United States");
+    expect(html).toContain('data-lat="35.23"');
+    expect(html).toContain("weather-change");
+    expect(w.calls[0].params.get("name")).toBe("Charlotte");
+    const other = await (await get(slot, `q=${encodeURIComponent("Charlotte, Michigan")}`)).text();
+    expect(other).toContain("Charlotte, Michigan, United States");
+  });
+
+  test("an unknown place is a 404 with a JSON error (and the miss is cached)", async () => {
+    const { w, slot } = setup();
+    const response = await get(slot, "q=zzzz");
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(await response.json()).toEqual({ error: "not found" });
+    await get(slot, "q=zzzz");
+    expect(w.count("geo")).toBe(1);
+  });
+
+  test("bad input is a 400 and costs nothing", async () => {
+    const { w, slot } = setup();
+    for (const query of ["", "lat=1", "lon=1", "lat=abc&lon=2", "lat=91&lon=0", "lat=0&lon=181", "lat=1e2&lon=0", "lat=NaN&lon=0", "lat=0x10&lon=0", "lat=&lon=", "q=", "q=%20%20", `q=${"x".repeat(MAX_QUERY_CHARS + 1)}`, "q=http%3A%2F%2Fevil.example", "q=%3Cscript%3E", "foo=bar", "lat=1.5.5&lon=2"]) {
+      const response = await get(slot, query);
+      expect(response.status, query).toBe(400);
+      expect((await response.json()).error).toBeTruthy();
+    }
+    expect(w.calls).toHaveLength(0);
+  });
+
+  test("it follows the settings: layout, units, air quality", async () => {
+    const { w, slot } = setup({ layout: "panel", units: "metric", showAirQuality: "true" });
+    const html = await (await get(slot, "lat=48.85&lon=2.35")).text();
+    expect(html).toContain("weather-card--panel");
+    expect(html).toContain("weather-change");
+    expect(w.count("air")).toBe(0);
+    expect(w.calls.find((c) => c.path === "/v1/forecast").params.get("temperature_unit")).toBe("celsius");
+    slot.configure({ layout: "inline", units: "imperial" });
+    expect(await (await get(slot, "lat=48.86&lon=2.36")).text()).toContain("weather-card--inline");
+  });
+
+  test("it shares the forecast cache by rounded coordinates, and the daily budget", async () => {
+    const { w, slot } = setup({ showAirQuality: "false", dailyRequestLimit: "2" });
+    await get(slot, "lat=35.2271&lon=-80.8431");
+    await get(slot, "lat=35.2301&lon=-80.8399");
+    expect(w.count("forecast")).toBe(1);
+    await capture(async () => {
+      expect((await get(slot, "lat=10&lon=10")).status).toBe(200);
+      expect((await get(slot, "lat=20&lon=20")).status).toBe(503);
+    });
+    expect(w.count("forecast")).toBe(2);
+  });
+
+  test("a failing upstream is a 503 JSON error; pauses are shared with the slot", async () => {
+    const { slot } = setup({}, { forecast: () => new Response("", { status: 429, headers: { "retry-after": "60" } }) });
+    let response;
+    await capture(async () => {
+      response = await get(slot, "lat=1&lon=2");
+    });
+    expect(response.status).toBe(503);
+    expect(slot.forecastUpstream.paused).toBe(true);
+  });
+
+  test("the time rule: a slow service gives a 504 and the reply is cached for the next try", async () => {
     const w = world();
-    const result = await command.execute("seattle", { fetch: w.fetch });
-    expect(result.html).toContain("weather-card");
-    expect(command.trigger).toBe("weather");
-    expect((await command.execute(["oslo"], { fetch: w.fetch })).html).toBeDefined();
-    expect((await command.execute("zzzz", { fetch: w.fetch })).html).toContain("!weather");
+    const slot = makeSlot({ showAirQuality: "false" });
+    slot.answerWindowMs = 30;
+    const slow = async (url, init) => {
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      return w.fetch(url, init);
+    };
+    slot.init({ template: TEMPLATE, fetch: slow });
+    expect((await get(slot, "lat=3&lon=4")).status).toBe(504);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    slot.answerWindowMs = 5000;
+    const before = w.calls.length;
+    expect((await get(slot, "lat=3&lon=4")).status).toBe(200);
+    expect(w.calls.length).toBe(before);
+  });
+
+  test("it works without an init context (falls back to the global fetch, which is not called here)", async () => {
+    const slot = makeSlot();
+    const response = await get(slot, "lat=abc");
+    expect(response.status).toBe(400);
+  });
+
+  test("never throws, whatever the request", async () => {
+    const slot = makeSlot();
+    for (const bad of [{ url: "not a url" }, {}, null, undefined]) {
+      const response = await slot.serveCard(bad);
+      expect([400, 500]).toContain(response.status);
+    }
+  });
+
+  test("debugMatching explains the route, without coordinates or secrets", async () => {
+    const { slot } = setup({ debugMatching: "true", showAirQuality: "false" });
+    const lines = await capture(async () => {
+      await get(slot, "lat=35.23&lon=-80.84");
+      await get(slot, "q=Charlotte%2C%20NC");
+      await get(slot, "q=zzzz");
+    });
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain("card route: browser location -> card shown");
+    expect(lines[1]).toContain('typed place "Charlotte, NC" -> card shown');
+    expect(lines[2]).toContain("no card (not found)");
+    expect(lines.join("\n")).not.toMatch(/35\.23|-80\.84|https?:/);
+  });
+
+  test("debugMatching explains the prompt for a generic query", async () => {
+    const slot = makeSlot({ debugMatching: "true" });
+    const lines = await capture(async () => {
+      await slot.execute("weather", { fetch: world().fetch });
+    });
+    expect(lines.join("\n")).toContain("generic weather query, no home location: rendered location prompt");
+  });
+});
+
+describe("card request validation (location.js)", () => {
+  const parse = (query) => parseCardRequest(new URLSearchParams(query));
+
+  test("coordinates and places", () => {
+    expect(parse("lat=35.2271&lon=-80.8431")).toEqual({ kind: "coords", lat: 35.23, lon: -80.84, label: "" });
+    expect(parse("lat=-33.8688&lon=151.2093&label=Sydney")).toEqual({ kind: "coords", lat: -33.87, lon: 151.21, label: "Sydney" });
+    expect(parse("lat=90&lon=180")).toMatchObject({ kind: "coords" });
+    expect(parse("lat=0&lon=0")).toMatchObject({ kind: "coords", lat: 0, lon: 0 });
+    expect(parse("q=%20Charlotte,%20NC%20")).toEqual({ kind: "query", q: "Charlotte, NC" });
+    expect(parse("lat=1&lon=2&q=paris")).toMatchObject({ kind: "coords" });
+  });
+
+  test("everything else is an error", () => {
+    for (const query of ["", "lat=1", "lat=91&lon=0", "lat=0&lon=-181", "lat=abc&lon=0", "lat=1e1&lon=0", "q=", `q=${"y".repeat(81)}`, "q=a%40b", "q=%3Cb%3E", "q=a%5Cb", "q=ftp%3A%2F%2Fx", "x=1"]) {
+      expect(parse(query).error, query).toBeTruthy();
+    }
+  });
+
+  test("rounding, labels, time zone names, the route address", () => {
+    expect(roundCoord(35.2271)).toBe(35.23);
+    expect(roundCoord(-80.8449)).toBe(-80.84);
+    expect(cleanLabel("  Charlotte\n\tNC <x> ")).toBe("Charlotte NC x");
+    expect(cleanLabel("é".repeat(100)).length).toBe(60);
+    expect(cleanLabel(null)).toBe("");
+    expect(labelFromTimezone("America/New_York")).toBe("New York");
+    expect(labelFromTimezone("America/Argentina/Buenos_Aires")).toBe("Buenos Aires");
+    expect(labelFromTimezone("Etc/GMT+5")).toBe("");
+    expect(labelFromTimezone("UTC")).toBe("");
+    expect(labelFromTimezone("")).toBe("");
+    expect(safeApiBase("/api/plugin/weather")).toBe("/api/plugin/weather");
+    expect(safeApiBase("/api/plugin/weather-x_1.2")).toBe("/api/plugin/weather-x_1.2");
+    for (const bad of ["https://evil.example", "//evil.example", "/api/other/x", "/api/plugin/", "/api/plugin/a/b", "/api/plugin/a b", null, undefined, 5]) expect(safeApiBase(bad)).toBe("/api/plugin/weather");
+  });
+});
+
+describe("the page script (script.js)", () => {
+  let api;
+  test("loads without a DOM and exposes its pure helpers", async () => {
+    await import("../plugins/weather/script.js");
+    api = globalThis.__degoogWeatherLocation;
+    expect(api).toBeDefined();
+    expect(api.STORAGE_KEY).toBe("degoog-ext:weather:location");
+  });
+
+  const memory = () => {
+    const map = new Map();
+    return { getItem: (key) => (map.has(key) ? map.get(key) : null), setItem: (key, value) => map.set(key, String(value)), removeItem: (key) => map.delete(key), map };
+  };
+
+  test("input mode: the button only where geolocation can work", () => {
+    expect(api.inputMode({ secure: true, hasGeolocation: true })).toBe("geolocation");
+    expect(api.inputMode({ secure: false, hasGeolocation: true })).toBe("city");
+    expect(api.inputMode({ secure: true, hasGeolocation: false })).toBe("city");
+    expect(api.inputMode({ secure: false, hasGeolocation: false })).toBe("city");
+  });
+
+  test("a saved place: validated, rounded, namespaced", () => {
+    const store = memory();
+    expect(api.readSaved(store)).toBeNull();
+    expect(api.writeSaved(store, { lat: 35.2271, lon: -80.8431, label: "Charlotte", query: "Charlotte, NC" })).toBe(true);
+    expect([...store.map.keys()]).toEqual(["degoog-ext:weather:location"]);
+    const saved = api.readSaved(store);
+    expect(saved).toMatchObject({ lat: 35.23, lon: -80.84, label: "Charlotte", query: "Charlotte, NC" });
+    expect(typeof saved.savedAt).toBe("number");
+    api.clearSaved(store);
+    expect(api.readSaved(store)).toBeNull();
+  });
+
+  test("bad saved values are ignored", () => {
+    const store = memory();
+    for (const raw of ["", "nope", "[]", "null", '{"lat":"x","lon":1}', '{"lat":91,"lon":0}', '{"lat":0,"lon":200}', '{"lat":null,"lon":null}']) {
+      store.setItem(api.STORAGE_KEY, raw);
+      expect(api.readSaved(store), raw).toBeNull();
+    }
+    expect(api.writeSaved(store, { lat: 999, lon: 0 })).toBe(false);
+  });
+
+  test("a storage that throws is survived", () => {
+    const broken = { getItem: () => { throw new Error("denied"); }, setItem: () => { throw new Error("denied"); }, removeItem: () => { throw new Error("denied"); } };
+    expect(api.readSaved(broken)).toBeNull();
+    expect(api.writeSaved(broken, { lat: 1, lon: 2 })).toBe(false);
+    expect(() => api.clearSaved(broken)).not.toThrow();
+  });
+
+  test("the card address: only the plugin's own route, rounded coordinates or a typed place", () => {
+    expect(api.cardUrl("/api/plugin/weather/card", { lat: 35.2271, lon: -80.8431 })).toBe("/api/plugin/weather/card?lat=35.23&lon=-80.84");
+    expect(api.cardUrl("/api/plugin/weather/card", { lat: 1, lon: 2, label: "Charlotte, NC" })).toBe("/api/plugin/weather/card?lat=1&lon=2&label=Charlotte%2C+NC");
+    expect(api.cardUrl("/api/plugin/weather/card", { q: " Charlotte, NC " })).toBe("/api/plugin/weather/card?q=Charlotte%2C+NC");
+    expect(api.cardUrl("/api/plugin/weather/card", { lat: 0, lon: 0 })).toBe("/api/plugin/weather/card?lat=0&lon=0");
+    for (const api2 of ["", "https://evil.example/card", "/other/card", "/api/plugin/x/y/card", "/api/plugin/weather/card?x=1", undefined, null]) {
+      expect(api.cardUrl(api2, { lat: 1, lon: 2 }), String(api2)).toBe("");
+    }
+    for (const place of [null, {}, { lat: 91, lon: 0 }, { lat: "", lon: "" }, { q: "   " }, { q: 5 }]) expect(api.cardUrl("/api/plugin/weather/card", place), JSON.stringify(place)).toBe("");
+  });
+
+  test("messages for a denied permission, other geolocation errors and the route's statuses", () => {
+    expect(api.geoMessage(1)).toContain("denied");
+    expect(api.geoMessage(1)).toContain("Type a city");
+    expect(api.geoMessage(2)).toContain("isn't available");
+    expect(api.geoMessage(3)).toContain("too long");
+    expect(api.geoMessage(0)).toContain("Type a city");
+    expect(api.statusMessage(404)).toContain("Couldn't find");
+    expect(api.statusMessage(400)).toContain("place name");
+    expect(api.statusMessage(503)).toContain("Try again");
+    expect(api.statusMessage(0)).toContain("Try again");
+  });
+
+  test("the file has one observer, delegated listeners and no eval", () => {
+    const js = readFileSync(new URL("../plugins/weather/script.js", import.meta.url), "utf8");
+    expect(js.match(/new MutationObserver/g)).toHaveLength(1);
+    expect(js).toContain("window.isSecureContext");
+    expect(js).toContain("navigator.geolocation");
+    expect(js).toContain("degoog-ext:weather:location");
+    expect(js).not.toMatch(/eval\(|new Function|document\.write|innerHTML\s*=\s*[^a-z]*location/);
+    for (const host of ["nominatim", "openstreetmap", "geoip", "ipapi", "ipinfo", "bigdatacloud"]) expect(js.toLowerCase()).not.toContain(host);
   });
 });

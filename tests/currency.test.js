@@ -8,13 +8,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Budget } from "../plugins/currency/budget.js";
 import { Coinbase, parseList, parseSpot, parseStats } from "../plugins/currency/coinbase.js";
-import { FIAT_CODES } from "../plugins/currency/currencies.js";
+import { CRYPTO_ALIASES, FIAT_ALIASES } from "../plugins/currency/aliases.js";
+import { CRYPTO_NAMES, FIAT_CODES, FIAT_NAMES, STARTER_CRYPTO } from "../plugins/currency/currencies.js";
 import { buildResult, formatMoney, formatPercent, formatRate, rateBetween } from "../plugins/currency/convert.js";
 import { parseQuery, resolveCurrency } from "../plugins/currency/match.js";
 import { FiatRates, RATES_TTL_MS, STALE_MAX_MS, parseFiat } from "../plugins/currency/rates.js";
 import { buildCard, formatStamp } from "../plugins/currency/render.js";
 import { SETTINGS_SCHEMA } from "../plugins/currency/settings.js";
-import { CurrencySlot, slot as sharedSlot, INLINE_POSITION, PANEL_POSITION, USER_AGENT, codeFrom, codesFrom, command, decimalsFrom, layoutFrom } from "../plugins/currency/index.js";
+import { CurrencySlot, slot as sharedSlot, INLINE_POSITION, PANEL_POSITION, USER_AGENT, codeFrom, codesFrom, decimalsFrom, layoutFrom } from "../plugins/currency/index.js";
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
 const ER = fixture("er-api-usd.json");
@@ -212,6 +213,145 @@ describe("parsing: ambiguous English words", () => {
   test("the reason says what to do", () => {
     expect(parseQuery("20 pounds").reason).toContain("ordinary word");
     expect(parseQuery("20 pounds").partial).toBe(true);
+  });
+});
+
+describe("natural phrasings", () => {
+  const table = [
+    ["usd to euro", "1 USD>EUR"],
+    ["usd to pound", "1 USD>GBP"],
+    ["usd to pounds", "1 USD>GBP"],
+    ["1 usd to pound", "1 USD>GBP"],
+    ["1 usd to euro", "1 USD>EUR"],
+    ["dollars to euros", "1 USD>EUR"],
+    ["dollar to euro", "1 USD>EUR"],
+    ["100 dollars in euros", "100 USD>EUR"],
+    ["5 quid in dollars", "5 GBP>USD"],
+    ["quid to dollars", "1 GBP>USD"],
+    ["how much is 20 euros in dollars", "20 EUR>USD"],
+    ["how much is 20 euros", "20 EUR>USD"],
+    ["convert 50 gbp to usd", "50 GBP>USD"],
+    ["usd in gbp", "1 USD>GBP"],
+    ["usd/eur", "1 USD>EUR"],
+    ["usd eur", "1 USD>EUR"],
+    ["eur usd", "1 EUR>USD"],
+    ["gbp jpy", "1 GBP>JPY"],
+    ["btc usd", "1 BTC>USD"],
+    ["euro to usd", "1 EUR>USD"],
+    ["1 bitcoin to usd", "1 BTC>USD"],
+    ["btc to eur", "1 BTC>EUR"],
+    ["20 bucks to yen", "20 USD>JPY"],
+    ["what is 100 yen in dollars", "100 JPY>USD"],
+    ["what is the price of 100 yen in dollars", null],
+    ["eur to usd rate", "1 EUR>USD"],
+    ["usd to eur exchange rate", "1 USD>EUR"],
+    ["usd to eur rate today", "1 USD>EUR"],
+    ["exchange rate between usd and eur", "1 USD>EUR"],
+    ["the exchange rate from gbp to usd", "1 GBP>USD"],
+    ["what is the exchange rate of gbp to usd", "1 GBP>USD"],
+    ["pound to dollar", "1 GBP>USD"],
+    ["pounds to dollars", "1 GBP>USD"],
+    ["pound sterling to usd", "1 GBP>USD"],
+    ["sterling to euro", "1 GBP>EUR"],
+    ["british pound to euro", "1 GBP>EUR"],
+    ["canadian dollar to us dollar", "1 CAD>USD"],
+    ["loonie to usd", "1 CAD>USD"],
+    ["aussie dollar to kiwi dollar", "1 AUD>NZD"],
+    ["won to usd", "1 KRW>USD"],
+    ["real to usd", "1 BRL>USD"],
+    ["rand to dollar", "1 ZAR>USD"],
+    ["100 baht in dollars", "100 THB>USD"],
+    ["ringgit to sgd", "1 MYR>SGD"],
+    ["peso to usd", "1 MXN>USD"],
+    ["argentine peso to usd", "1 ARS>USD"],
+    ["swiss francs to euros", "1 CHF>EUR"],
+    ["rupees to dollars", "1 INR>USD"],
+    ["10 reais to dollars", "10 BRL>USD"],
+    ["shekels to euro", "1 ILS>EUR"],
+    ["dirham to usd", "1 AED>USD"],
+    ["doge to usd", "1 DOGE>USD"],
+    ["1 dogecoin to usd", "1 DOGE>USD"],
+    ["ether to euro", "1 ETH>EUR"],
+  ];
+  for (const [query, expected] of table) test(`${query} => ${expected}`, () => expect(summary(query)).toBe(expected));
+
+  test("the dollarMeans setting decides what a bare dollar is", () => {
+    expect(summary("dollars to euros", { dollarMeans: "CAD" })).toBe("1 CAD>EUR");
+    expect(summary("usd to dollars", { dollarMeans: "CAD" })).toBe("1 USD>CAD");
+    expect(summary("canadian dollars to euros", { dollarMeans: "AUD" })).toBe("1 CAD>EUR");
+  });
+
+  test("only one currency side: not a conversion", () => {
+    for (const query of ["usd to kg", "kg to usd", "usd to apples", "usd to", "to eur", "usd to xyz", "5 usd to km", "pound to kg", "pound to oz", "usd to pound cake"]) expect(summary(query), query).toBeNull();
+  });
+
+  test("a word that is also a code needs an amount, or 'convert'", () => {
+    for (const query of ["usd to try", "try to usd", "all to usd", "usd to all", "can usd", "all usd", "mad usd", "usd top", "one usd"]) expect(summary(query), query).toBeNull();
+    expect(summary("1 usd to try")).toBe("1 USD>TRY");
+    expect(summary("convert usd to try")).toBe("1 USD>TRY");
+  });
+
+  test("two bare tokens are a pair only when both are real, non-word codes", () => {
+    for (const query of ["usd foo", "hello usd", "usd dollar", "euro dollar", "usd 5", "usd usd", "pound dollar"]) expect(summary(query), query).toBeNull();
+  });
+
+  test("the reason names the ordinary word that stopped the match", () => {
+    expect(parseQuery("try to usd").reason).toContain('"TRY"');
+    expect(parseQuery("usd to pound cake").reason).toContain("not a currency");
+    expect(parseQuery("won to won").reason).toBeTruthy();
+  });
+});
+
+describe("the alias table", () => {
+  test("every alias points at a code the provider serves", () => {
+    for (const [code, names] of Object.entries(FIAT_ALIASES)) {
+      expect(FIAT_CODES.has(code), code).toBe(true);
+      expect(names.length, code).toBeGreaterThan(0);
+    }
+    for (const [name, code] of FIAT_NAMES) expect(code === "$" || FIAT_CODES.has(code), `${name} -> ${code}`).toBe(true);
+  });
+
+  test("every crypto alias points at a known crypto code", () => {
+    for (const code of Object.keys(CRYPTO_ALIASES)) expect(STARTER_CRYPTO.has(code), code).toBe(true);
+    for (const [name, code] of CRYPTO_NAMES) expect(STARTER_CRYPTO.has(code), `${name} -> ${code}`).toBe(true);
+  });
+
+  test("names are lower case and not listed for two currencies", () => {
+    const seen = new Map();
+    for (const [code, names] of Object.entries(FIAT_ALIASES)) {
+      for (const name of names) {
+        expect(name, name).toBe(name.toLowerCase());
+        expect(seen.has(name) && seen.get(name) !== code, `${name} is listed for ${seen.get(name)} and ${code}`).toBe(false);
+        seen.set(name, code);
+      }
+    }
+  });
+
+  test("every currency the provider serves has at least one name", () => {
+    const named = new Set([...FIAT_NAMES.values()]);
+    expect([...FIAT_CODES].filter((code) => !named.has(code))).toEqual([]);
+  });
+
+  test("every alias resolves to its code, alone and as a plural where it is a plain noun", () => {
+    for (const [name, code] of FIAT_NAMES) {
+      const resolved = resolveCurrency(name, { dollarMeans: "USD" });
+      expect(resolved?.code, name).toBe(code === "$" ? "USD" : code);
+    }
+    for (const name of ["euro", "yen", "dollar", "peso", "rupee", "baht", "franc", "shekel", "dirham", "ringgit", "zloty", "forint", "krone"]) {
+      expect(resolveCurrency(`${name}s`)?.code, `${name}s`).toBe(resolveCurrency(name)?.code);
+    }
+  });
+
+  test("the colloquial words", () => {
+    for (const [text, code] of [["bucks", "USD"], ["buck", "USD"], ["greenbacks", "USD"], ["quid", "GBP"], ["sterling", "GBP"], ["loonies", "CAD"], ["aussie", "AUD"], ["kiwi", "NZD"], ["renminbi", "CNY"], ["rmb", "CNY"], ["yuan", "CNY"], ["rupees", "INR"], ["pesos", "MXN"], ["francs", "CHF"], ["reais", "BRL"], ["rand", "ZAR"], ["roubles", "RUB"], ["lira", "TRY"], ["naira", "NGN"], ["cedis", "GHS"], ["rupiah", "IDR"], ["dong", "VND"], ["won", "KRW"], ["riyals", "SAR"], ["rials", "IRR"], ["zlotys", "PLN"], ["hryvnia", "UAH"], ["bitcoins", "BTC"], ["doge", "DOGE"], ["ether", "ETH"], ["ethereum", "ETH"]]) {
+      expect(resolveCurrency(text)?.code, text).toBe(code);
+    }
+  });
+
+  test("qualified pesos, kronor and dinars", () => {
+    for (const [text, code] of [["argentine peso", "ARS"], ["colombian pesos", "COP"], ["chilean peso", "CLP"], ["philippine peso", "PHP"], ["swedish krona", "SEK"], ["norwegian kroner", "NOK"], ["danish krone", "DKK"], ["kuwaiti dinar", "KWD"], ["serbian dinars", "RSD"], ["swiss franc", "CHF"], ["hong kong dollars", "HKD"], ["singapore dollar", "SGD"], ["new zealand dollars", "NZD"]]) {
+      expect(resolveCurrency(text)?.code, text).toBe(code);
+    }
   });
 });
 
@@ -877,15 +1017,11 @@ describe("debugMatching", () => {
   });
 });
 
-describe("the bang command", () => {
-  test("renders the same card", async () => {
-    sharedSlot.spacingMs = 0;
-    sharedSlot.fiat.file = "";
-    sharedSlot.fiat.budget.file = "";
-    const w = world();
-    const result = await command.execute("100 usd to eur", { fetch: w.fetch });
-    expect(result.html).toContain("currency-card");
-    expect(command.trigger).toBe("convert");
-    expect((await command.execute("hello", { fetch: w.fetch })).html).toContain("!convert");
+describe("one menu entry", () => {
+  test("the module exports a slot and no bang command (a command would add a second entry to degoog's plugin list)", async () => {
+    const mod = await import("../plugins/currency/index.js");
+    expect(mod.slot).toBe(sharedSlot);
+    expect("command" in mod).toBe(false);
+    expect("default" in mod).toBe(false);
   });
 });

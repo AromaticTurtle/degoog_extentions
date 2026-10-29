@@ -19,7 +19,7 @@ Finnhub API key. Without a key the plugin shows nothing.** The free plan covers 
 3. Put it in **one** of these places (the settings value wins when both are set):
    - **degoog's settings**: Settings > Plugins > Stocks (Finnhub) > Configure > *Finnhub API key*. It is stored on the server only.
    - **the container environment**: `FINNHUB_API_KEY=your-key` (for example `-e FINNHUB_API_KEY=...` or in your compose file).
-4. Install the plugin from this repository (Settings > Store), and enable it. It also adds a `!stock aapl` command.
+4. Install the plugin from this repository (Settings > Store), and enable it.
 
 The key is sent **only** in the request header `X-Finnhub-Token`. It is never put in a URL, a log line, an error message, the page, or a
 file on disk; a test checks all of that. Finnhub's free plan: **60 calls a minute, US stocks, no card needed**. Candle (chart) data
@@ -92,9 +92,6 @@ The calculator, currency, dictionary, weather and stocks plugins do not fight ov
 table): stocks never takes currency or crypto codes without `$`, never takes `stock` in a non-financial sense and never takes pure math;
 `define stock` goes to the dictionary, `10 usd to eur` to the currency plugin.
 
-## Bang command
-`!stock aapl` or `!stock apple` (aliases `!stocks`, `!quote`) renders the same card. Named exports only (`slot`, `command`), see the
-calculator README. A small `script.js` hides a company logo that fails to load.
 
 ## Troubleshooting: why did (or didn't) a card show
 Turn on **Explain matching in the log**. A near miss writes one line with the rule, a lookup one block, and the key is never in it:
@@ -124,3 +121,6 @@ pauses), `store.js` (the small on-disk memory), `format.js`, `render.js`, `budge
 `tests/stocks.test.js`, `tests/mock-stocks-server.js` (set `DEGOOG_STOCKS_API_BASE=http://host:4510/api/v1`; it requires the header
 `X-Finnhub-Token: test-key` and refuses a key in a URL). The fixtures use invented companies (Quillfern Systems `QFRN`, Brambleton Foods
 `BRMB`, Midsummer Optics `MIDS`) in Finnhub's documented layouts.
+
+## Changelog
+**Version 1.1.0:** the `!stock` bang command was removed. degoog lists a plugin's slot and its command as two separate entries in Settings > Plugins, and a plugin file cannot be both, so every plugin showed twice. The plain queries cover everything the bang did. After updating, restart degoog (or reload extensions) so the old `stocks-command` entry disappears; settings you saved on the slot entry are kept.

@@ -241,23 +241,3 @@ export class CurrencySlot {
 }
 
 export const slot = new CurrencySlot();
-
-// "!convert 100 usd to eur" renders the same card. Named exports, no default export: degoog's command loader would prefer a
-// default export over a named `command` (see the reddit-lens plugin).
-export const command = {
-  isClientExposed: false,
-  name: "Currency converter",
-  description: "!convert 100 usd to eur, !convert btc: the currency card.",
-  trigger: "convert",
-  aliases: ["currency", "cur"],
-  settingsSchema: [],
-
-  configure() {},
-
-  async execute(args, context) {
-    const query = Array.isArray(args) ? args.join(" ") : String(args ?? "");
-    const html = await slot.build(query, context);
-    if (!html) return { title: "Currency converter", html: '<div class="command-result currency-result"><div class="currency-card currency-card--inline"><div class="currency-kicker">Currency</div><div class="currency-expression">Try <code>!convert 100 usd to eur</code> or <code>!convert btc</code></div></div></div>' };
-    return { title: "", html: slot.template.replace(/\{\{content\}\}/g, () => html) };
-  },
-};

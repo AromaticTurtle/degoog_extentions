@@ -129,10 +129,10 @@ const table = [
   ["premier league scores", ["sports"]],
   ["next lakers game", ["sports"]],
   // sports near misses: nobody
-  ["panthers", []],
-  ["rams", []],
-  ["lakers", []],
-  ["panther", []],
+  ["panthers", ["dictionary"]],
+  ["rams", ["dictionary"]],
+  ["lakers", ["dictionary"]],
+  ["panther", ["dictionary"]],
   ["panthers roster", []],
   ["panthers schedule", []],
   ["lakers news", []],
@@ -156,24 +156,73 @@ const table = [
   ["weather in charlotte", ["weather"]],
   ["charlotte weather", ["weather"]],
   ["weather for the panthers game", []],
-  ["apple stock", ["stocks"]],
   ["rams stock", ["stocks"]],
   ["10 km to mi", ["calculator"]],
   ["100 usd", ["currency"]],
-  ["usd to eur", ["currency"]],
   ["stock pot", []],
-  ["chicken stock", []],
-  ["2+2", ["calculator"]],
   ["lakers 2+2 score", []],
   ["panthers 5 km to miles", []],
   ["aapl score", []],
   ["btc score", []],
   ["usd game", []],
+  // currency phrasings, colloquial names, and the pound that is also a unit of mass
+  ["usd to pound", ["currency"]],
+  ["1 usd to pound", ["currency"]],
+  ["usd to euro", ["currency"]],
+  ["usd to pounds", ["currency"]],
+  ["dollars to euros", ["currency"]],
+  ["5 quid in dollars", ["currency"]],
+  ["how much is 20 euros in dollars", ["currency"]],
+  ["usd eur", ["currency"]],
+  ["usd/eur", ["currency"]],
+  ["20 bucks to yen", ["currency"]],
+  ["what is 100 yen in dollars", ["currency"]],
+  ["eur to usd rate", ["currency"]],
+  ["usd to eur exchange rate", ["currency"]],
+  ["exchange rate between usd and eur", ["currency"]],
+  ["pound to dollar", ["currency"]],
+  ["pound sterling to usd", ["currency"]],
+  ["1 bitcoin to usd", ["currency"]],
+  ["btc to eur", ["currency"]],
+  ["10 pounds to kg", ["calculator"]],
+  ["1 pound to oz", ["calculator"]],
+  ["5 pounds to stone", ["calculator"]],
+  ["150 lb to kg", ["calculator"]],
+  ["usd to kg", []],
+  ["usd to try", []],
+  ["try to usd", []],
+  ["1 usd to try", ["currency"]],
+  ["pound to kg", []],
+  ["pound cake", []],
+  ["usd foo", []],
+  // bare words: the dictionary defines a lone word nobody else claims
+  ["colloquial", ["dictionary"]],
+  ["Colloquial", ["dictionary"]],
+  ["ephemeral", ["dictionary"]],
+  ["colloquialisms", ["dictionary"]],
+  ["well-known", ["dictionary"]],
+  ["google", []],
+  ["youtube", []],
+  ["reddit", []],
+  ["login", []],
+  ["12345", []],
+  ["a", []],
+  ["ab", []],
+  ["x.com", []],
+  ["NASA", []],
+  ["iPhone", []],
+  ["forecast", ["weather"]],
+  ["scores", []],
+  ["bitcoin", ["currency"]],
+  ["ethereum", ["currency"]],
+  ["btc", ["currency"]],
+  ["msft", ["stocks"]],
+  ["MSFT", ["stocks"]],
   // nobody
   ["", []],
-  ["serendipity", []],
-  ["dollar", []],
-  ["pound", []],
+  ["serendipity", ["dictionary"]],
+  ["dollar", ["dictionary"]],
+  ["pound", ["dictionary"]],
   ["bitcoin news", []],
   ["weather paris", ["weather"]],
   ["iphone 15 pro", []],
@@ -182,7 +231,7 @@ const table = [
   ["euro truck simulator", []],
   ["50 km to usd", []],
   ["100 usd to kg", []],
-  ["try", []],
+  ["try", ["dictionary"]],
   ["20 pounds", []],
 ];
 
@@ -235,10 +284,15 @@ describe("one owner per query", () => {
     expect(off.trigger("AAPL stock")).toBe(true);
   });
 
-  test("the dictionary never takes a bare word, a calculation or a currency question", () => {
-    for (const query of ["serendipity", "happy", "dog", "dollar", "2+2", "100 usd to eur", "btc", "5 km to miles", "what is serendipity", "define", "meaning"]) {
+  test("the dictionary takes a lone word only with the setting on, and never a calculation, a currency question or a question sentence", () => {
+    for (const query of ["2+2", "100 usd to eur", "5 km to miles", "what is serendipity", "define", "meaning", "weather", "forecast", "score", "btc", "bitcoin", "AAPL", "msft", "google", "12345", "usd"]) {
       expect(dictionary.trigger(query), query).toBe(false);
     }
+    for (const query of ["serendipity", "happy", "dog", "dollar"]) expect(dictionary.trigger(query), query).toBe(true);
+    const off = new DictionarySlot();
+    off.configure({ triggerOnBareWord: "false" });
+    for (const query of ["serendipity", "happy", "dog", "dollar"]) expect(off.trigger(query), query).toBe(false);
+    expect(off.trigger("define serendipity")).toBe(true);
   });
   test("the sports plugin never takes a bare team, a calculation, a currency or a stock question", () => {
     for (const query of ["panthers", "lakers", "arsenal", "man utd", "nfl", "2+2", "100 usd to eur", "AAPL", "$AAPL", "AAPL stock", "weather in charlotte", "define score", "credit score", "score", "game", "match"]) {

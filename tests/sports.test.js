@@ -15,7 +15,7 @@ import { INLINE_LIST_MAX, PANEL_LIST_MAX, buildGameCard, buildLeagueCard, search
 import { SETTINGS_SCHEMA } from "../plugins/sports/settings.js";
 import { buildIndex, index, norm, resolveTeams, teamById, teamsOfLeague } from "../plugins/sports/teams.js";
 import { dayDiff, dayKey, espnDate, kickoffLabel, serverZone, shortDate, validZone, whenToDate } from "../plugins/sports/time.js";
-import { INLINE_POSITION, PANEL_POSITION, SportsSlot, USER_AGENT, command, layoutFrom, leaguesFrom, refreshFrom, slot as sharedSlot } from "../plugins/sports/index.js";
+import { INLINE_POSITION, PANEL_POSITION, SportsSlot, USER_AGENT, layoutFrom, leaguesFrom, refreshFrom, slot as sharedSlot } from "../plugins/sports/index.js";
 
 const NOW = Date.parse("2026-10-28T23:00:00Z"); // Wednesday evening in New York
 const HOUR = 3_600_000;
@@ -1316,41 +1316,12 @@ describe("the slot", () => {
 });
 
 // ------------------------------------------------------------------------------------------------------------------------
-describe("the bang command", () => {
-  const ctxWith = (w) => ({ fetch: w.fetch });
-  test("named exports only", async () => {
+describe("one menu entry", () => {
+  test("the module exports a slot and no bang command (a command would add a second entry to degoog's plugin list)", async () => {
     const mod = await import("../plugins/sports/index.js");
-    expect("default" in mod).toBe(false);
     expect(mod.slot).toBe(sharedSlot);
-    expect(command.trigger).toBe("score");
-    expect(command.aliases).toEqual(expect.arrayContaining(["scores", "sports"]));
-    expect(command.isClientExposed).toBe(false);
-  });
-
-  test("!score panthers renders the card without refresh attributes", async () => {
-    sharedSlot.budget.file = "";
-    sharedSlot.spacingMs = 0;
-    sharedSlot.now = () => NOW;
-    sharedSlot.configure({ timezone: ZONE });
-    const w = world({ boards: { nfl: scoreboard([game({ id: "1", away: side(T.panthers, 3), home: side(T.packers, 0), status: STATUS.live({ period: 1, clock: "9:00" }) })]) }, schedules: { "nfl:29": schedule([]) } });
-    const out = await command.execute(["carolina", "panthers"], ctxWith(w));
-    expect(out.title).toBe("");
-    expect(out.html).toContain("sports-card");
-    expect(out.html).not.toContain("data-query");
-    sharedSlot.now = Date.now;
-    sharedSlot.spacingMs = undefined;
-  });
-
-  test("!score nfl falls back to the scoreboard; no card gives a hint", async () => {
-    sharedSlot.budget.file = "";
-    sharedSlot.spacingMs = 0;
-    sharedSlot.now = () => NOW;
-    const w = world({ boards: { nfl: scoreboard([game({ id: "1", away: side(T.panthers, 3), home: side(T.packers, 0), status: STATUS.final() })]) } });
-    expect((await command.execute("nfl", ctxWith(w))).html).toContain("NFL · Scores");
-    expect((await command.execute("", ctxWith(w))).html).toContain("Try");
-    expect((await command.execute(["zzzz"], ctxWith(w))).html).toContain("Try");
-    sharedSlot.now = Date.now;
-    sharedSlot.spacingMs = undefined;
+    expect("command" in mod).toBe(false);
+    expect("default" in mod).toBe(false);
   });
 });
 
@@ -1364,7 +1335,7 @@ describe("package files", () => {
     expect(JSON.parse(read("../plugins/sports/author.json")).name).toBe("AromaticTurtle");
     const manifest = JSON.parse(read("../package.json"));
     const entry = manifest.plugins.find((p) => p.path === "plugins/sports");
-    expect(entry).toMatchObject({ type: "slot", version: "1.0.0", minDegoogVersion: "1.1.0" });
+    expect(entry).toMatchObject({ type: "slot", version: "1.1.0", minDegoogVersion: "1.1.0" });
   });
 
   test("the css is scoped and has no external resources", () => {

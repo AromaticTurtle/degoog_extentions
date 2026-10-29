@@ -21,7 +21,8 @@ import {
 export const MAX_AMOUNT = 1e15;
 const AMOUNT = String.raw`\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+`;
 const CONNECTIVE = /^(.+?)\s+(?:to|in|into|as|vs|versus|=|->)\s+(.+)$/;
-const LEADING = /^(?:how\s+much\s+(?:is|are|do|does)|what(?:'s|\s+is|\s+are)|whats|convert|exchange|change|currency\s+converter|currency|calculate)\s+/;
+const LEADING = /^(?:how\s+much\s+(?:is|are|do|does)|what(?:'s|\s+is|\s+are)|whats|convert|exchange|change|currency\s+converter|currency|calculate)\s+(?:the\s+)?/;
+const RATE_OF = /^(?:the\s+)?(?:current\s+|latest\s+|live\s+)?(?:exchange\s+)?rates?\s+(?:from|between|of|for)\s+(.+)$/;
 const TRAILING = /\s+(?:exchange\s+rates?|rates?|conversion|converter|currency|today|now|right\s+now)$/;
 const PRICE_OF = /^(?:(?:what\s+is\s+|what's\s+)?(?:the\s+)?(?:current\s+|latest\s+)?price\s+of\s+)(.+)$/;
 const PRICE_SUFFIX = /^(.+?)\s+(?:price|value)(?:\s+(?:in|to|vs)\s+(.+))?$/;
@@ -106,6 +107,13 @@ export const parseQuery = (query, options = {}) => {
     if (stripped === text) break;
     text = stripped;
   }
+  let rateOf = false;
+  const rateMatch = RATE_OF.exec(text);
+  if (rateMatch) {
+    // "exchange rate between usd and eur", "rate from usd to eur"
+    rateOf = true;
+    text = rateMatch[1].replace(/\s+(?:and|&)\s+/, " to ");
+  }
   if (!text) return reject("nothing left after the prefix");
 
   let amount = null;
@@ -115,12 +123,21 @@ export const parseQuery = (query, options = {}) => {
   let rule = "";
 
   const pair = /^([a-z]{3})\s*\/\s*([a-z]{3})$/.exec(text);
+  const twoWords = /^([a-z0-9]{2,6})\s+([a-z0-9]{2,6})$/.exec(text);
+  const twoCodes = !pair && twoWords && [twoWords[1], twoWords[2]].every((word) => {
+    const side = resolveCurrency(word, options);
+    return side && side.via === "code" && !side.wordlike;
+  });
   const symbolFirst = symbolPattern.exec(text);
   const numberFirst = new RegExp(`^(${AMOUNT})\\s*(.*)$`).exec(text);
   if (pair) {
     left = pair[1];
     right = pair[2];
     rule = "currency pair";
+  } else if (twoCodes) {
+    left = twoWords[1];
+    right = twoWords[2];
+    rule = "two currency codes";
   } else if (symbolFirst) {
     amount = parseAmount(symbolFirst[2]);
     left = symbolFirst[1];
@@ -173,11 +190,16 @@ export const parseQuery = (query, options = {}) => {
 
   const amountGiven = amount !== null;
   const connective = right !== null;
-  const unambiguousForm = (amountGiven && connective) || convertPrefix;
+  const unambiguousForm = (amountGiven && connective) || convertPrefix || rateOf;
   for (const side of [from, to]) {
     if (!side || !side.wordlike || unambiguousForm) continue;
     if (priceWord && side === from && side.via === "name") continue;
-    return reject(`"${side.via === "code" ? side.code : left}" is also an ordinary word: write an amount and "to", or start with "convert"`, true, text);
+    // a word that is also a currency name ("pound", "won", "real") counts next to a currency that is not an ordinary word
+    // ("usd to pound", "pound to dollars"); a code that is an ordinary word ("try", "all") never does without an amount
+    const other = side === from ? to : from;
+    if (connective && side.via === "name" && other && !other.wordlike) continue;
+    const shown = side === from ? left : right;
+    return reject(`"${side.via === "code" ? side.code : shown}" is also an ordinary word: write an amount and "to", or start with "convert"`, true, text);
   }
 
   if (!connective) {

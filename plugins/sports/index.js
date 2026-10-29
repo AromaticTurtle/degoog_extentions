@@ -439,25 +439,3 @@ export class SportsSlot {
 }
 
 export const slot = new SportsSlot();
-
-// "!score panthers" renders the same card. Named exports, no default export: degoog's command loader would prefer a default
-// export over a named `command` (see the reddit-lens plugin). The card is not refreshed on the page (there is no query to repeat).
-export const command = {
-  isClientExposed: false,
-  name: "Sports scores",
-  description: "!score panthers, !score nfl: the live score card for a team or a league.",
-  trigger: "score",
-  aliases: ["scores", "sports"],
-  settingsSchema: [],
-
-  configure() {},
-
-  async execute(args, context) {
-    const words = (Array.isArray(args) ? args.join(" ") : String(args ?? "")).trim();
-    const hint = '<div class="command-result sports-result"><div class="sports-card sports-card--hint" data-live="false"><div class="sports-kicker">Sports</div><div class="sports-hint">Try <code>!score panthers</code> or <code>!score nfl</code></div></div></div>';
-    if (!words) return { title: "Sports", html: hint };
-    const html = (await slot.build(`${words} score`, context)) || (await slot.build(`${words} scores`, context));
-    if (!html) return { title: "Sports", html: hint };
-    return { title: "", html: slot.template.replace(/\{\{content\}\}/g, () => html) };
-  },
-};

@@ -55,15 +55,21 @@ const hintKind = (hint) => {
 
 // "paris texas" -> { name: "paris", hint: "texas", kind: "region" }; "charlotte, nc"; "london" -> { name: "london", hint: "" }
 export const splitPlace = (text) => {
-  const clean = String(text ?? "").replace(/\s+/g, " ").trim();
-  const comma = clean.lastIndexOf(",");
-  if (comma > 0) {
-    const name = clean.slice(0, comma).trim();
-    const hint = clean.slice(comma + 1).trim();
-    const kind = hintKind(hint) || (hint ? "soft" : "");
-    if (name && hint) return { name, hint, kind };
-    if (name) return { name, hint: "", kind: "" };
+  let clean = String(text ?? "").replace(/\s+/g, " ").trim();
+  // a US ZIP code after a place name is dropped ("Charlotte, NC 28202"); a ZIP on its own is searched as it is
+  const zip = /^(.*[A-Za-z].*?)[,\s]+\d{5}(?:-\d{4})?$/.exec(clean);
+  if (zip) clean = zip[1].trim().replace(/,$/, "");
+  const segments = clean.split(",").map((part) => part.trim()).filter(Boolean);
+  if (segments.length >= 2) {
+    // "Charlotte, NC", "Charlotte, NC, USA", "Paris, Texas, United States": the first part is the name, the most specific known
+    // region after it is the hint (the geocoder only searches by name)
+    const name = segments[0];
+    const hints = segments.slice(1);
+    const hint = hints.find((candidate) => hintKind(candidate) === "region") ?? hints[0];
+    const kind = hintKind(hint) || "soft";
+    return { name, hint, kind };
   }
+  if (segments.length === 1 && clean.endsWith(",")) clean = segments[0];
   const whole = norm(clean);
   if (REGION_NAMES.has(whole) || whole in COUNTRIES) return { name: clean, hint: "", kind: "" };
   const words = clean.split(" ");

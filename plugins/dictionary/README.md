@@ -1,6 +1,6 @@
 # Dictionary for degoog
 
-A dictionary card for **explicit** dictionary questions, from the [Free Dictionary API](https://dictionaryapi.dev) (English, content
+A dictionary card for dictionary questions, and for a word typed on its own, from the [Free Dictionary API](https://dictionaryapi.dev) (English, content
 from Wiktionary, CC BY-SA 3.0). It is a replacement for the official **define** plugin: **disable the official define plugin** in
 Settings > Plugins so the two do not both answer.
 
@@ -10,15 +10,39 @@ Settings > Plugins so the two do not both answer.
 | `what does serendipity mean`, `what is the definition of serendipity`, `what's the meaning of life` | the card |
 | `synonyms for happy`, `happy synonym`, `antonyms of happy`, `opposite of happy` | the card with the synonym / antonym chips first |
 | `how to pronounce quinoa`, `quinoa pronunciation`, `pronounce quinoa` | the card with the play buttons |
-| `serendipity`, `happy`, `what is serendipity`, `define 2+2`, `define c++` | nothing: a bare word never triggers it |
+| `colloquial`, `ephemeral`, `Serendipity`, `well-known`, `colloquialisms` (the plural falls back to `colloquialism`) | the card (the **bare word** trigger, on by default) |
+| `what is serendipity`, `define 2+2`, `define c++`, `weather`, `google`, `AAPL`, `12345`, `x.com`, `a` | nothing: not a word to look up (see below) |
 
 The word is one word (letters, apostrophe, hyphen, up to 40 characters) or a short phrase of at most three words (`define ice cream`).
 `the word love` and `the term love` are reduced to `love`. A phrase the dictionary does not know (for example `meaning of life`)
 simply shows no card.
 
 ## Setup
-1. In degoog: Settings > Store > add this repository, then install **Dictionary** (plugin, plus a command for `!define`).
+1. In degoog: Settings > Store > add this repository, then install **Dictionary** (one entry in Settings > Plugins).
 2. Disable the official **define** plugin. There is no key and no account.
+
+## A word typed on its own
+Setting **Define a word typed on its own** (`triggerOnBareWord`, **on by default**). A search that is just one word shows its
+definition above the web results. **The trade-off:** a word with a second life (`python`, `apple`, `mercury`, `rust`) shows the
+dictionary card above the web results too. Turn the setting off and only the explicit forms (`define X`, `X meaning`, `synonyms of X`,
+`how to pronounce X`...) trigger, as in version 1.0.
+
+A bare word must be **one token of letters** (an inner hyphen or apostrophe is fine), **3 to 30 characters**, lower case or
+Capitalised. Shorter words work through the explicit forms (`define go`). It is **skipped without any request** when:
+- it is not a plain word: digits, a dot, slash, `@`, `:` or other symbols (`12345`, `x.com`, `a/b`, `c++`), several words, ALL CAPS
+  (`NASA`, `AAPL`: a ticker or an acronym) or mixed capitals (`iPhone`);
+- another core plugin answers it: `weather`, `forecast` (weather), `score`, `scores` and the league names (sports), constants and
+  function names such as `tau`, `sqrt` (calculator), `bitcoin`, `btc`, `ethereum`, `doge` (currency), and the well-known tickers
+  such as `msft`, `meta` (stocks). A currency code (`usd`, `eur`) is not a word either; codes that are English words (`top`, `pen`,
+  `try`) can still be defined;
+- it is on the **stoplist** of popular sites and brands (`google`, `youtube`, `facebook`, `reddit`, `amazon`, `gmail`, `login`...:
+  `bare-lists.js`, a modest list), or is a stop word (`the`, `meaning`, `define`).
+
+An unknown word costs one request, is remembered as unknown for 24 hours (on disk), and the daily limit still applies. The lemma
+fallback works for bare words too: `colloquialisms` shows `colloquialism` ("Showing the entry for ..."). Each plugin keeps its own
+gating; `tests/dictionary.test.js` checks the deferral lists against the plugins that own those words, and
+`tests/domain-routing.test.js` holds the table of who answers what. With **Explain matching in the log** on, a one-word search writes
+`"colloquial" -> bare word: lookup` or `"google" -> bare word: skipped (a popular site or brand (stoplist))`.
 
 ## Layout: inline or panel
 Setting **Layout**; the card moves as soon as you save.
@@ -73,9 +97,6 @@ Definitions come from **Wiktionary**, shared under **CC BY-SA 3.0**, through the
 "Source: Wiktionary via Free Dictionary API (CC BY-SA 3.0)" with links to the word's Wiktionary page, dictionaryapi.dev and the licence.
 The audio comes with its own licences (mostly Wikimedia Commons recordings).
 
-## Bang command
-`!define serendipity` (aliases `!dict`, `!dictionary`) renders the same card. Named exports only (`slot`, `routes`, `command`), see the
-calculator README.
 
 ## Troubleshooting: why did (or didn't) a card show
 Turn on **Explain matching in the log**. A near miss (`define the`) writes one line with the reason; a lookup writes a block:
@@ -94,3 +115,6 @@ JSON keys (never the text).
 `upstream.js`, `budget.js`, `index.js`. Tests: `tests/dictionary.test.js`, `tests/mock-dictionary-server.js` (set
 `DEGOOG_DICTIONARY_API_BASE` and `DEGOOG_DICTIONARY_MEDIA_BASE` to its address; only for tests). Fixtures use invented words
 (`florbit`, `quillfern`) in the API's layout.
+
+## Changelog
+**Version 1.1.0:** a word typed on its own is defined (setting `triggerOnBareWord`, on by default, with the guards above). Also: the `!define` bang command was removed. degoog lists a plugin's slot and its command as two separate entries in Settings > Plugins, and a plugin file cannot be both, so every plugin showed twice. The plain queries above cover everything the bang did. After updating, restart degoog (or reload extensions) so the old `dictionary-command` entry disappears; settings you saved on the slot entry are kept.

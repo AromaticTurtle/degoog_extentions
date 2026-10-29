@@ -22,11 +22,11 @@ export const SETTINGS_SCHEMA = [
   {
     key: "homeLocation",
     fieldset: "Location",
-    label: "Home location",
+    label: "Home location (optional)",
     type: "text",
     default: "",
     placeholder: "Charlotte, NC",
-    description: "Used for 'weather', 'forecast', 'weather near me' and 'is it raining'. Any place name; add the state or country to be exact ('Paris, Texas', 'London, Ontario'). It is looked up once and remembered. Empty: a bare 'weather' shows a hint card.",
+    description: "Optional. A fixed place for everybody who searches 'weather', 'forecast' or 'weather near me': any place name, with the state or country to be exact ('Charlotte, NC', 'Paris, Texas', 'London, Ontario'; a ZIP code works too). When it is set it wins: those searches show this place straight away. When it is empty, those searches show a small card where each visitor can use their browser's location (needs https or localhost) or type a city; the choice is remembered in that browser only and never stored on the server. A place that cannot be found is said on the card, not silently dropped.",
   },
   {
     key: "showAirQuality",

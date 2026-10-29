@@ -6,18 +6,18 @@ prices from Coinbase's public API (no key either). There is no official currency
 | You type | You get |
 |---|---|
 | `100 usd to eur`, `convert 50 gbp to yen`, `100 dollars in euros`, `how much is 20 euros in dollars` | the conversion, both rates, the amount in your other currencies |
-| `usd to eur`, `eur/usd`, `usd to eur exchange rate` | the rate for 1 unit |
-| `20 eur`, `$100`, `£20`, `100 yen`, `5 bucks` | the amount in your home currency |
-| `1 btc to usd`, `eth to eur`, `100 usd to btc`, `bitcoin price`, `price of ethereum`, `btc` | the crypto price, 24 h change, 24 h low/high, volume |
+| `usd to eur`, `usd to euro`, `usd to pound`, `usd to pounds`, `dollars to euros`, `euro to usd`, `usd in gbp`, `eur/usd`, `usd eur`, `usd to eur exchange rate`, `eur to usd rate`, `exchange rate between usd and eur` | the rate for 1 unit |
+| `20 eur`, `$100`, `£20`, `100 yen`, `5 bucks`, `5 quid in dollars`, `20 bucks to yen`, `what is 100 yen in dollars` | the amount (to the other currency you named, or your home currency) |
+| `1 btc to usd`, `1 bitcoin to usd`, `btc to eur`, `doge to usd`, `100 usd to btc`, `bitcoin price`, `price of ethereum`, `btc` | the crypto price, 24 h change, 24 h low/high, volume |
 | `canadian dollars`, `pounds sterling`, `swiss francs`, `reais`, `rupees`, `kronor`, `renminbi`... | names, plurals and symbols (`€ £ ¥ ₹ ₩ ₽ ₺ ₪ ₿`) are understood |
 
-All 166 codes the rates service serves are known. A plain `dollar` or `$` means US dollars unless you change the setting
-(`canadian dollars`, `us$`, `a$` are always exact). Some names are ambiguous and use a default: `peso` is the Mexican peso,
+All 166 codes the rates service serves are known, each with at least one name. The names are data (`aliases.js`), tested one by one: `dollar`, `buck`, `greenback`, `canadian dollar`, `loonie`, `aussie dollar`, `kiwi`, `pound`, `quid`, `sterling`, `british pound`, `pound sterling`, `euro`, `yen`, `yuan`, `renminbi`, `rmb`, `rupee`, `peso`, `franc`, `krona`, `krone`, `won`, `real`/`reais`, `rand`, `ruble`/`rouble`, `lira`, `shekel`, `dirham`, `baht`, `ringgit`, `zloty`, `forint`, `koruna`, `riyal`/`rial`, `dong`, `rupiah`, `naira`, `cedi`, `bitcoin`, `ether`, `doge`... plus country-qualified forms for every currency (`argentine peso`, `norwegian krone`, `uzbek som`) and their plurals. A plain `dollar` or `$` means US dollars unless you change the setting
+(`canadian dollars`, `us$`, `a$` are always exact). The **Dollar means** setting (`dollarMeans`, default USD) is what a bare `dollar`, `dollars`, `buck` or `$` is: with it set to CAD, `dollars to euros` is Canadian dollars and `usd to dollars` is USD to CAD. Some names are ambiguous and use a default: `peso` is the Mexican peso,
 `krone` the Danish one, `lira` the Turkish one, `rupee` the Indian one, `riyal` the Saudi one, `¥` the yen. Write the full
 name (`philippine pesos`, `norwegian krone`) for the others.
 
 ## Setup
-1. In degoog: Settings > Store > add this repository, then install **Currency converter** (plugin, plus a command for `!convert`).
+1. In degoog: Settings > Store > add this repository, then install **Currency converter** (one entry in Settings > Plugins).
 2. Nothing else is needed: no key, no account.
 
 ## Layout: inline or panel
@@ -66,16 +66,20 @@ after 70 % of `DEGOOG_SLOT_TIMEOUT_MS` (default 10 s) and a lookup still running
 ## Which queries it takes (and which it never does)
 - Pure math (`2+2`, `15% of 80`) and non-currency units (`5 km to miles`) are never taken: they belong to the
   [calculator](../calculator/README.md).
-- English words that are also currency codes or names (`try`, `all`, `mad`, `pen`, `top`, `won`, `real`, `pound`, `lei`...) only count in
-  an unambiguous form: a **number before them and `to`/`in`/`into`** (`100 try to usd`, `20 pounds to usd`) or a **`convert ...`**
-  query. `20 pounds`, `try to usd` or `all` alone do nothing.
+- **Two sides, both currencies.** A conversion needs a currency on each side, or an amount (`20 eur`). `usd to kg` and `usd to apples`
+  are not conversions (one side is not a currency); `usd foo` and `usd dollar` are not either. Two bare tokens (`usd eur`, `btc usd`)
+  count only when **both** are real codes that are not ordinary words.
+- **The pound is also a unit of mass.** `usd to pound`, `pound to dollar`, `5 quid in dollars` are money here; `10 pounds to kg`,
+  `1 pound to oz`, `150 lb to kg` belong to the [calculator](../calculator/README.md), which never takes a currency. A word that is also
+  a currency name (`pound`, `won`, `real`, `rand`, `lira`, `mark`, `lei`...) counts when the other side is a currency that is not
+  an ordinary word, or when there is an amount and `to`/`in`, or after `convert`. `20 pounds` or `pound` alone do nothing.
+- A code that is also an English word (`try`, `all`, `mad`, `pen`, `top`, `can`, `one`...) needs the strongest form: **a number before
+  it and `to`/`in`/`into`** (`1 usd to try`, `100 try to usd`) or a **`convert ...`** query. `usd to try`, `try to usd` and `all usd`
+  do nothing.
 - A lone currency is not a conversion (`usd`, `euro`, `dollar`), except `btc`, `eth`, `xrp`, `doge`, `ltc` and the names
   bitcoin/ethereum... which show the price. `bitcoin news` or `euro 2024` are left alone.
 - Crypto off (the setting) means no crypto query is taken.
 
-## Bang command
-`!convert 100 usd to eur` (aliases `!currency`, `!cur`) renders the same card. Named exports only (`slot`, `command`), see the
-calculator README.
 
 ## Troubleshooting: why did (or didn't) a card show
 Turn on **Explain matching in the log**. A query that mentions a currency but is not a conversion writes one line with the rule
@@ -90,3 +94,6 @@ JSON keys (never values), which is what to paste if a provider changes its layou
 `tests/mock-currency-server.js` (one port serving er-api and Coinbase paths; set `DEGOOG_CURRENCY_ER_BASE`,
 `DEGOOG_CURRENCY_COINBASE_BASE` and `DEGOOG_CURRENCY_EXCHANGE_BASE` to its address; `GET /__mode?er=429` etc. switches behaviour).
 Fixtures are hand-written with invented numbers in the providers' documented layouts.
+
+## Changelog
+**Version 1.1.0:** natural phrasings without an amount or with colloquial names now work (`usd to pound`, `usd to euro`, `1 usd to pound`, `usd eur`, `exchange rate between usd and eur`, `20 bucks to yen`), the alias table covers every currency the provider serves (`aliases.js`), and the pound is shared cleanly with the calculator. Also: the `!convert` bang command was removed. degoog lists a plugin's slot and its command as two separate entries in Settings > Plugins, and a plugin file cannot be both, so every plugin showed twice. The plain queries above cover everything the bang did. After updating, restart degoog (or reload extensions) so the old `currency-command` entry disappears; settings you saved on the slot entry are kept.

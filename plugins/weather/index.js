@@ -3,7 +3,8 @@ import { parseQuery } from "./match.js";
 import { norm, pickPlace, placeLabel, splitPlace } from "./places.js";
 import { DEFAULT_AIR_BASE, DEFAULT_FORECAST_BASE, DEFAULT_GEOCODING_BASE, airUrl, forecastUrl, geocodeUrl, parseAir, parseForecast, parseGeocode } from "./request.js";
 import { unitsFor } from "./format.js";
-import { buildCard, buildHint } from "./render.js";
+import { buildCard, buildPrompt } from "./render.js";
+import { labelFromTimezone, parseCardRequest, roundCoord, safeApiBase } from "./location.js";
 import { Budget, usageFile } from "./budget.js";
 import { Upstream } from "./upstream.js";
 
@@ -14,7 +15,7 @@ export const PANEL_POSITION = "knowledge-panel";
 export const USER_AGENT = "degoog-weather/1.0 (+https://github.com/AromaticTurtle/degoog_extentions)";
 export const FORECAST_TTL_MS = 10 * 60_000;
 export const GEOCODE_TTL_MS = 30 * 24 * 60 * 60_000;
-export const GEOCODE_NONE_TTL_MS = 7 * 24 * 60 * 60_000;
+export const GEOCODE_NONE_TTL_MS = 24 * 60 * 60_000;
 export const DEFAULT_DAILY_LIMIT = 5000;
 const FALLBACK_TEMPLATE = '<div class="command-result weather-result">{{content}}</div>';
 const EMPTY = { title: "", html: "" };
@@ -71,6 +72,8 @@ export class WeatherSlot {
   forecastBase = process.env.DEGOOG_WEATHER_FORECAST_BASE || DEFAULT_FORECAST_BASE;
   geocodingBase = process.env.DEGOOG_WEATHER_GEOCODING_BASE || DEFAULT_GEOCODING_BASE;
   airBase = process.env.DEGOOG_WEATHER_AIR_BASE || DEFAULT_AIR_BASE;
+  apiBase = "/api/plugin/weather";
+  _initContext = null;
 
   now = Date.now;
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -94,6 +97,9 @@ export class WeatherSlot {
 
   init(context) {
     if (context?.template) this.template = context.template;
+    this.apiBase = safeApiBase(context?.apiBase, this.apiBase);
+    // The card route is called by the page script with no slot context: it uses degoog's fetch and cache from here.
+    this._initContext = context ?? null;
   }
 
   configure(settings = {}) {
@@ -211,26 +217,92 @@ export class WeatherSlot {
     }
   }
 
+  // Forecast (and air quality) for a resolved place -> { html, steps, why }
+  async cardFor(place, label, context, deadline, options = {}) {
+    const steps = [];
+    const wantsAir = this.showAirQuality && this.layout === "inline";
+    const [forecast, air] = await Promise.all([this.forecast(place, context, deadline), wantsAir ? this.air(place, context, deadline) : Promise.resolve(null)]);
+    steps.push(`forecast: ${forecast.forecast ? `ok (${forecast.source})` : `unavailable (${forecast.why})`}; air quality: ${wantsAir ? (air ? `ok (US AQI ${air.aqi})` : "unavailable") : "off"}`);
+    if (!forecast.forecast) return { html: "", steps, why: "no forecast" };
+    const shownLabel = label || labelFromTimezone(forecast.forecast.timezone) || "Your location";
+    const html = buildCard({ label: shownLabel, forecast: forecast.forecast, air, units: unitsFor(this.system), place: options.saved ? { lat: roundCoord(place.lat), lon: roundCoord(place.lon) } : null }, { layout: this.layout, changeLink: Boolean(options.saved) });
+    return { html, steps, why: "" };
+  }
+
+  prompt(message = "") {
+    return buildPrompt({ layout: this.layout, api: this.apiBase, message });
+  }
+
   async compute(parsed, context, deadline) {
     const steps = [];
     const text = parsed.home ? this.home : parsed.place;
     if (!text) {
-      const hintOk = parsed.bare || (parsed.home && parsed.rule !== "question");
-      steps.push(`no place in the query and no home location set: ${hintOk ? "hint card" : "nothing"}`);
-      return { html: hintOk ? buildHint() : "", steps, why: "no place" };
+      const promptOk = parsed.bare || (parsed.home && parsed.rule !== "question");
+      steps.push(promptOk ? "generic weather query, no home location: rendered location prompt" : "no place in the query and no home location set: nothing");
+      return { html: promptOk ? this.prompt() : "", steps, why: "no place" };
     }
     steps.push(`place text "${text}"${parsed.home ? " (home location)" : ""}`);
     const geo = await this.geocode(text, context, deadline);
     steps.push(`geocoding: ${geo.status}${geo.source ? ` (${geo.source})` : ""}${geo.reason ? `: ${geo.reason}` : geo.why ? ` (${geo.why})` : ""}`);
     for (const candidate of geo.candidates ?? []) steps.push(`  ${candidate.verdict}: ${candidate.name}${candidate.population ? ` (population ${candidate.population})` : ""}`);
-    if (geo.status !== "found") return { html: "", steps, why: geo.status === "none" ? "no such place" : "geocoding unavailable" };
-    const place = geo.place;
-    const wantsAir = this.showAirQuality && this.layout === "inline";
-    const [forecast, air] = await Promise.all([this.forecast(place, context, deadline), wantsAir ? this.air(place, context, deadline) : Promise.resolve(null)]);
-    steps.push(`forecast: ${forecast.forecast ? `ok (${forecast.source})` : `unavailable (${forecast.why})`}; air quality: ${wantsAir ? (air ? `ok (US AQI ${air.aqi})` : "unavailable") : "off"}`);
-    if (!forecast.forecast) return { html: "", steps, why: "no forecast" };
-    const html = buildCard({ label: placeLabel(place), forecast: forecast.forecast, air, units: unitsFor(this.system) }, { layout: this.layout });
-    return { html, steps, why: "" };
+    if (geo.status !== "found") {
+      // A home location that cannot be resolved must not fail silently: say so, and offer the other ways to set a place.
+      if (parsed.home) {
+        const problem = geo.status === "none" ? `Couldn't find “${text}”. Check the Home location setting, or use your location.` : "Weather isn't available right now (the weather service could not be reached). Try again in a minute.";
+        steps.push("home location failed: rendered the location prompt with the problem");
+        return { html: this.prompt(problem), steps, why: geo.status === "none" ? "home location not found" : "geocoding unavailable" };
+      }
+      return { html: "", steps, why: geo.status === "none" ? "no such place" : "geocoding unavailable" };
+    }
+    const done = await this.cardFor(geo.place, placeLabel(geo.place), context, deadline);
+    steps.push(...done.steps);
+    if (!done.html && parsed.home) {
+      steps.push("home location: forecast failed, rendered the location prompt with the problem");
+      return { html: this.prompt("Weather isn't available right now (the weather service could not be reached). Try again in a minute."), steps, why: done.why };
+    }
+    return { html: done.html, steps, why: done.why };
+  }
+
+  // The route the page script calls (GET <api>/card). -> { status, html?, error? }
+  async cardForRequest(request, context) {
+    const parsed = parseCardRequest(request);
+    if (parsed.error) return { status: 400, error: parsed.error };
+    const answerBy = this.now() + this.answerWindowMs;
+    const deadline = this.now() + this.startWindowMs;
+    let timer;
+    const timeout = new Promise((resolve) => {
+      timer = setTimeout(() => resolve(TIMED_OUT), Math.max(0, answerBy - this.now()));
+    });
+    const work = (async () => {
+      if (parsed.kind === "coords") {
+        const place = { lat: roundCoord(parsed.lat), lon: roundCoord(parsed.lon) };
+        return { ...(await this.cardFor(place, parsed.label, context, deadline, { saved: true })), steps: [] };
+      }
+      const geo = await this.geocode(parsed.q, context, deadline);
+      if (geo.status === "none") return { html: "", why: "not found", status: 404 };
+      if (geo.status !== "found") return { html: "", why: "geocoding unavailable", status: 503 };
+      return this.cardFor(geo.place, placeLabel(geo.place), context, deadline, { saved: true });
+    })();
+    const outcome = await Promise.race([work, timeout]);
+    clearTimeout(timer);
+    if (this.debugMatching) {
+      const what = parsed.kind === "coords" ? "browser location" : `typed place "${parsed.q.slice(0, 60)}"`;
+      console.info(`[weather] card route: ${what} -> ${outcome === TIMED_OUT ? "too slow for the slot; the reply is cached when it arrives" : outcome.html ? "card shown" : `no card (${outcome.why})`}`);
+    }
+    if (outcome === TIMED_OUT) return { status: 504, error: "too slow" };
+    if (outcome.html) return { status: 200, html: this.template.replace(/\{\{content\}\}/g, () => outcome.html) };
+    return { status: outcome.status ?? 503, error: outcome.why || "unavailable" };
+  }
+
+  async serveCard(request) {
+    const headers = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
+    try {
+      const result = await this.cardForRequest(new URL(request.url).searchParams, this._initContext ?? {});
+      if (result.html) return new Response(result.html, { status: 200, headers: { ...headers, "Content-Type": "text/html; charset=utf-8" } });
+      return new Response(JSON.stringify({ error: result.error }), { status: result.status, headers: { ...headers, "Content-Type": "application/json; charset=utf-8" } });
+    } catch {
+      return new Response(JSON.stringify({ error: "unavailable" }), { status: 500, headers: { ...headers, "Content-Type": "application/json; charset=utf-8" } });
+    }
   }
 
   async build(query, context) {
@@ -267,22 +339,5 @@ export class WeatherSlot {
 
 export const slot = new WeatherSlot();
 
-// "!weather paris" renders the same card. Named exports, no default export: degoog's command loader would prefer a default
-// export over a named `command` (see the reddit-lens plugin).
-export const command = {
-  isClientExposed: false,
-  name: "Weather",
-  description: "!weather paris, !weather: the weather card.",
-  trigger: "weather",
-  aliases: ["forecast", "wx"],
-  settingsSchema: [],
-
-  configure() {},
-
-  async execute(args, context) {
-    const place = (Array.isArray(args) ? args.join(" ") : String(args ?? "")).trim();
-    const html = await slot.build(place ? `weather in ${place}` : "weather", context);
-    if (!html) return { title: "Weather", html: '<div class="command-result weather-result"><div class="weather-card weather-card--hint"><div class="weather-kicker">Weather</div><div class="weather-hint">Try <code>!weather paris</code></div></div></div>' };
-    return { title: "", html: slot.template.replace(/\{\{content\}\}/g, () => html) };
-  },
-};
+// The card route: degoog serves it at <apiBase>/card (the page script reads the address from the prompt card). Named export.
+export const routes = [{ method: "get", path: "/card", rateLimit: true, handler: (request) => slot.serveCard(request) }];

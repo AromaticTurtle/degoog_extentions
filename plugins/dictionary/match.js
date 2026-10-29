@@ -1,14 +1,16 @@
 // Decides whether a query is an explicit dictionary question, and for which word. Pure: no I/O, never throws.
 //
-// Ownership (see README): the dictionary only answers when the query has an explicit dictionary word (define, definition,
-// meaning, synonym, antonym, pronounce...). A bare word never triggers.
+// Ownership (see README): the dictionary answers when the query has an explicit dictionary word (define, definition, meaning,
+// synonym, antonym, pronounce...), and, with the triggerOnBareWord setting (on by default), for a bare word: one token of letters,
+// 3 to 30 characters, lower case or capitalised, that no other core plugin answers and that is not a popular site or brand.
+import { BARE_STOPLIST, CURRENCY_CODES, DEFER } from "./bare-lists.js";
 
 export const MAX_WORD_CHARS = 40;
 export const MAX_WORDS = 3;
 
 const WORD = String.raw`[a-z][a-z'’-]*`;
 const TERM = String.raw`(${WORD}(?:\s+${WORD}){0,${MAX_WORDS - 1}})`;
-const STOP = new Set(["the", "a", "an", "this", "that", "it", "of", "in", "to", "for", "is", "what", "and", "or", "on", "at", "by", "my", "your", "word", "words", "term", "meaning", "definition", "definitions", "synonym", "synonyms", "antonym", "antonyms", "pronunciation", "dictionary"]);
+const STOP = new Set(["the", "a", "an", "this", "that", "it", "of", "in", "to", "for", "is", "what", "and", "or", "on", "at", "by", "my", "your", "word", "words", "term", "meaning", "definition", "definitions", "synonym", "synonyms", "antonym", "antonyms", "pronunciation", "dictionary", "define", "pronounce"]);
 
 const rules = [
   // intent "define"
@@ -43,8 +45,29 @@ const clean = (query) =>
     .replace(/\s+/g, " ")
     .trim();
 
-// -> { parsed: { word, intent, rule } | null, reason }
-export const parseQuery = (query) => {
+export const BARE_MIN = 3;
+export const BARE_MAX = 30;
+
+// A single word typed on its own -> { word } to look up, or { skip: reason }
+export const bareWord = (query) => {
+  const raw = String(query ?? "").normalize("NFKC").trim();
+  if (!raw || /\s/.test(raw)) return { skip: "more than one word" };
+  if (/[./\\@:!#$%&*+=<>()\[\]{}|~^`0-9_,;?"]/.test(raw)) return { skip: "not made of letters only (a digit, dot, slash, @ or other symbol)" };
+  if (raw.length < BARE_MIN) return { skip: `shorter than ${BARE_MIN} letters` };
+  if (raw.length > BARE_MAX) return { skip: `longer than ${BARE_MAX} letters` };
+  if (!/^[A-Za-z]+(?:['’-][A-Za-z]+)*$/.test(raw)) return { skip: "not a plain word (letters with an inner hyphen or apostrophe only)" };
+  if (raw === raw.toUpperCase()) return { skip: "all capitals: a ticker or an acronym, not a word" };
+  if (/[A-Z]/.test(raw.slice(1))) return { skip: "mixed capitals: a name, not a word" };
+  const word = raw.toLowerCase();
+  if (STOP.has(word)) return { skip: "a stop word" };
+  if (BARE_STOPLIST.has(word)) return { skip: "a popular site or brand (stoplist)" };
+  for (const [plugin, words] of Object.entries(DEFER)) if (words.has(word)) return { skip: `the ${plugin} plugin answers this word` };
+  if (CURRENCY_CODES.has(word)) return { skip: "a currency code, not a word" };
+  return { word };
+};
+
+// -> { parsed: { word, intent, rule } | null, reason, bare?: "lookup" | "skipped" }
+export const parseQuery = (query, { bareWord: allowBare = false } = {}) => {
   const text = clean(query);
   if (!text) return { parsed: null, reason: "empty" };
   if (text.length > 80) return { parsed: null, reason: "too long" };
@@ -64,6 +87,11 @@ export const parseQuery = (query) => {
     if (words.every((w) => STOP.has(w))) continue;
     if (STOP.has(words[0]) && words.length === 1) continue;
     return { parsed: { word, intent, rule: pattern.source.slice(0, 40) }, reason: `dictionary question (${intent})` };
+  }
+  if (allowBare && !matched) {
+    const bare = bareWord(String(query ?? "").replace(/[?!.]+$/, ""));
+    if (bare.word) return { parsed: { word: bare.word, intent: "define", rule: "bare word" }, reason: "bare word", bare: "lookup" };
+    return { parsed: null, reason: `bare word skipped: ${bare.skip}`, bare: "skipped" };
   }
   return { parsed: null, reason: matched ? "the word is only a stop word" : "no dictionary word (define, definition, meaning, synonym, antonym, pronounce...) with a word" };
 };

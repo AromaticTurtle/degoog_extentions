@@ -89,23 +89,3 @@ export class CalculatorSlot {
 }
 
 export const slot = new CalculatorSlot();
-
-// "!calc 15% of 80" renders the same card. Named exports, no default export: degoog's command loader would prefer a default
-// export over a named `command` (see the reddit-lens plugin).
-export const command = {
-  isClientExposed: false,
-  name: "Calculator",
-  description: "!calc 15% of 80, !calc 5 km to miles: the calculator card.",
-  trigger: "calc",
-  aliases: ["calculate"],
-  settingsSchema: [],
-
-  configure() {},
-
-  async execute(args) {
-    const query = Array.isArray(args) ? args.join(" ") : String(args ?? "");
-    const html = slot.render(query);
-    if (!html) return { title: "Calculator", html: '<div class="command-result calculator-result"><div class="calculator-card calculator-card--inline"><div class="calculator-kicker">Calculator</div><div class="calculator-expression">Try <code>!calc 15% of 80</code> or <code>!calc 5 km to miles</code></div></div></div>' };
-    return { title: "", html: slot.template.replace(/\{\{content\}\}/g, () => html) };
-  },
-};

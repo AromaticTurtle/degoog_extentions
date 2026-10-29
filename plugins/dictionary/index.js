@@ -72,6 +72,7 @@ export class DictionarySlot {
   maxMeanings = 3;
   showExamples = true;
   showSynonyms = true;
+  triggerOnBareWord = true;
   audio = "proxy";
   debugMatching = false;
   apiBase = "/api/plugin/dictionary";
@@ -107,6 +108,7 @@ export class DictionarySlot {
     this.maxMeanings = maxMeaningsFrom(settings.maxMeanings);
     this.showExamples = truthy(settings.showExamples, true);
     this.showSynonyms = truthy(settings.showSynonyms, true);
+    this.triggerOnBareWord = truthy(settings.triggerOnBareWord, true);
     this.audio = audioFrom(settings.audio);
     this.debugMatching = truthy(settings.debugMatching, false);
     this.budget.cap = limitOf(settings.dailyRequestLimit, DEFAULT_DAILY_LIMIT);
@@ -126,11 +128,20 @@ export class DictionarySlot {
     return this._inflight.get(id);
   }
 
+  inspect(query) {
+    return parseQuery(query, { bareWord: this.triggerOnBareWord });
+  }
+
   trigger(query) {
     try {
-      const result = parseQuery(query);
-      if (!result.parsed && this.debugMatching && /\b(?:define|definition|meaning|mean|synonyms?|antonyms?|pronounce|pronunciation)\b/i.test(String(query ?? ""))) {
-        console.info(`[dictionary] "${String(query).replace(/\s+/g, " ").trim().slice(0, 100)}" not a dictionary question: ${result.reason}`);
+      const result = this.inspect(query);
+      const shown = String(query ?? "").replace(/\s+/g, " ").trim().slice(0, 100);
+      if (this.debugMatching) {
+        if (result.bare === "lookup") console.info(`[dictionary] "${shown}" -> bare word: lookup`);
+        else if (result.bare === "skipped" && !/\s/.test(shown)) console.info(`[dictionary] "${shown}" -> bare word: skipped (${result.reason.replace(/^bare word skipped: /, "")})`);
+        else if (!result.parsed && /\b(?:define|definition|meaning|mean|synonyms?|antonyms?|pronounce|pronunciation)\b/i.test(String(query ?? ""))) {
+          console.info(`[dictionary] "${shown}" not a dictionary question: ${result.reason}`);
+        }
       }
       return Boolean(result.parsed);
     } catch {
@@ -205,7 +216,7 @@ export class DictionarySlot {
   }
 
   async build(query, context) {
-    const { parsed } = parseQuery(query);
+    const { parsed } = this.inspect(query);
     if (!parsed) return "";
     const answerBy = this.now() + this.answerWindowMs;
     const deadline = this.now() + this.startWindowMs;
@@ -252,24 +263,3 @@ export const slot = new DictionarySlot();
 
 // The audio route: degoog serves it at /api/plugin/dictionary/audio. Named export (see the README).
 export const routes = [{ method: "get", path: "/audio", handler: (request) => slot.audioProxy.serve(request) }];
-
-// "!define serendipity" renders the same card. Named exports, no default export: degoog's command loader would prefer a
-// default export over a named `command` (see the reddit-lens plugin).
-export const command = {
-  isClientExposed: false,
-  name: "Dictionary",
-  description: "!define serendipity: the dictionary card.",
-  trigger: "define",
-  aliases: ["dict", "dictionary"],
-  settingsSchema: [],
-
-  configure() {},
-
-  async execute(args, context) {
-    const query = Array.isArray(args) ? args.join(" ") : String(args ?? "");
-    const word = query.trim();
-    const html = word ? await slot.build(`define ${word}`, context) : "";
-    if (!html) return { title: "Dictionary", html: '<div class="command-result dictionary-result"><div class="dictionary-card dictionary-card--inline"><div class="dictionary-kicker">Dictionary · English</div><div class="dictionary-note">Try <code>!define serendipity</code></div></div></div>' };
-    return { title: "", html: slot.template.replace(/\{\{content\}\}/g, () => html) };
-  },
-};

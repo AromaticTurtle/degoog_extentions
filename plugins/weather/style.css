@@ -329,6 +329,139 @@
   font-size: 0.9375rem;
 }
 
+/* the "use my location" prompt */
+.weather-prompt-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.weather-prompt-text {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+}
+
+.weather-prompt-text--problem {
+  color: var(--danger, #ea4335);
+}
+
+.weather-locate,
+.weather-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--white, #fff);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.weather-locate:hover,
+.weather-save:hover {
+  border-color: var(--primary-hover, var(--primary));
+  background: var(--primary-hover, var(--primary));
+}
+
+.weather-locate:focus-visible,
+.weather-save:focus-visible,
+.weather-input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.weather-locate[hidden],
+.weather-note[hidden],
+.weather-loading[hidden],
+.weather-prompt-body[hidden] {
+  display: none;
+}
+
+.weather-city {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 28rem;
+}
+
+.weather-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-light);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.weather-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.weather-save {
+  flex: 0 0 auto;
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.weather-save:hover {
+  border-color: var(--primary);
+  background: transparent;
+}
+
+.weather-note,
+.weather-status,
+.weather-loading {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.weather-status:empty {
+  display: none;
+}
+
+.weather-loading {
+  padding: 24px 0;
+  font-size: 0.875rem;
+}
+
+.weather-card--panel .weather-locate {
+  width: 100%;
+}
+
+.weather-card .weather-link {
+  color: var(--text-secondary);
+  text-decoration: underline;
+}
+
+.weather-card .weather-change {
+  white-space: nowrap;
+}
+
+.weather-card .weather-link:hover {
+  color: var(--text-link);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather-locate,
+  .weather-save {
+    transition: none;
+  }
+}
+
 .weather-footer {
   padding-top: 8px;
   border-top: 1px solid var(--border);

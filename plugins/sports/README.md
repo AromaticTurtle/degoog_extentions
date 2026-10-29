@@ -27,7 +27,7 @@ their ESPN short name, so `duke score` and `texas game` work, while a bare city 
 there (`chicago bears score`).
 
 ## Setup
-1. In degoog: Settings > Store > add this repository, then install **Sports scores (ESPN)** (a plugin, plus a command for `!score`).
+1. In degoog: Settings > Store > add this repository, then install **Sports scores (ESPN)** (one entry in Settings > Plugins).
 2. Optional: Settings > Plugins > Sports scores > Configure: **Layout**, **Leagues**, **Time zone**, **auto refresh**.
 
 There is no official degoog sports plugin, so there is nothing to disable.
@@ -99,7 +99,6 @@ again by repeating the page's own request (`POST /api/slots` with the original q
 - the server answers from its cache: a **live board is cached for 20 seconds**, so any number of open pages cost ESPN one request
   per league per 20 seconds, whatever the interval. A board with a game starting within 30 minutes is cached for 1 minute, any other
   board for 5 minutes, a finished past day for 6 hours, a team schedule for 1 hour;
-- the `!score` command card is not refreshed (there is no query to repeat).
 
 Turn it off with the setting if you do not want the page to talk to the server by itself.
 
@@ -131,9 +130,6 @@ Kick-off times and dates use the **Time zone** setting (an IANA name such as `Am
   seen in a recording; unknown shapes are ignored, not shown.
 - Odds, play by play, standings, player and roster queries are out of scope.
 
-## Bang command
-`!score panthers` (aliases `!scores`, `!sports`) renders the same card; `!score nfl` the scoreboard. Named exports only (`slot`,
-`command`), see the calculator README.
 
 ## Troubleshooting: why did (or didn't) a card show
 Turn on **Explain matching in the log**. A near miss (`credit score`) writes one line with the reason; a lookup writes a block:
@@ -160,3 +156,6 @@ fallback and auto refresh), `upstream.js`, `budget.js`, `index.js`. Tests: `test
 core plugins against each other), `tests/mock-sports-server.js` (set `DEGOOG_SPORTS_API_BASE` to its address;
 `GET /__mode?nfl=live|final|scheduled|postponed|delayed|empty&nhl=...&status=429|500` switches behaviour, the live game's score goes
 up every 10 seconds).
+
+## Changelog
+**Version 1.1.0:** the `!score` bang command was removed. degoog lists a plugin's slot and its command as two separate entries in Settings > Plugins, and a plugin file cannot be both, so every plugin showed twice. The plain queries cover everything the bang did. After updating, restart degoog (or reload extensions) so the old `sports-command` entry disappears; settings you saved on the slot entry are kept.

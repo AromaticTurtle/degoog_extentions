@@ -18,7 +18,7 @@ import { SETTINGS_SCHEMA } from "../plugins/stocks/settings.js";
 import { Store } from "../plugins/stocks/store.js";
 import { BARE_STOPLIST, NOT_FINANCIAL, REJECT_FIRST, WELL_KNOWN } from "../plugins/stocks/stoplist.js";
 import { FinnhubUpstream } from "../plugins/stocks/upstream.js";
-import { CANDLES_UNAVAILABLE_TTL_MS, INLINE_POSITION, NEGATIVE_TTL_MS, PANEL_POSITION, QUOTE_CLOSED_TTL_MS, QUOTE_OPEN_TTL_MS, StocksSlot, USER_AGENT, command, keyFrom, layoutFrom, slot as sharedSlot } from "../plugins/stocks/index.js";
+import { CANDLES_UNAVAILABLE_TTL_MS, INLINE_POSITION, NEGATIVE_TTL_MS, PANEL_POSITION, QUOTE_CLOSED_TTL_MS, QUOTE_OPEN_TTL_MS, StocksSlot, USER_AGENT, keyFrom, layoutFrom, slot as sharedSlot } from "../plugins/stocks/index.js";
 
 const KEY = "test-key-0123456789";
 const BASE = "https://finnhub.example/api/v1";
@@ -1232,21 +1232,11 @@ describe("debugMatching", () => {
   });
 });
 
-describe("the bang command", () => {
-  test("renders the same card", async () => {
-    sharedSlot.spacingMs = 0;
-    sharedSlot.budget.file = "";
-    sharedSlot.store.file = "";
-    sharedSlot.baseUrl = BASE;
-    sharedSlot.configure({ apiKey: KEY });
-    const w = world();
-    const result = await command.execute("$QFRN", { fetch: w.fetch });
-    expect(result.html).toContain("stocks-card");
-    expect(command.trigger).toBe("stock");
-    const byName = await command.execute("quillfern", { fetch: w.fetch });
-    expect(byName.html).toContain("stocks-card");
-    expect((await command.execute("", { fetch: w.fetch })).html).toContain("!stock");
-    expect((await command.execute(["zzzzq"], { fetch: w.fetch })).html).toContain("!stock");
-    sharedSlot.configure({});
+describe("one menu entry", () => {
+  test("the module exports a slot and no bang command (a command would add a second entry to degoog's plugin list)", async () => {
+    const mod = await import("../plugins/stocks/index.js");
+    expect(mod.slot).toBe(sharedSlot);
+    expect("command" in mod).toBe(false);
+    expect("default" in mod).toBe(false);
   });
 });

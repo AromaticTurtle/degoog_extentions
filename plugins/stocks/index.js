@@ -353,23 +353,3 @@ export class StocksSlot {
 }
 
 export const slot = new StocksSlot();
-
-// "!stock aapl" renders the same card. Named exports, no default export: degoog's command loader would prefer a default
-// export over a named `command` (see the reddit-lens plugin).
-export const command = {
-  isClientExposed: false,
-  name: "Stocks",
-  description: "!stock aapl, !stock apple: the stock card.",
-  trigger: "stock",
-  aliases: ["stocks", "quote"],
-  settingsSchema: [],
-
-  configure() {},
-
-  async execute(args, context) {
-    const word = (Array.isArray(args) ? args.join(" ") : String(args ?? "")).trim();
-    const html = word ? await slot.build(/^\$|\b(?:stock|shares?|quote)\b/i.test(word) ? word : `${word} stock`, context) : "";
-    if (!html) return { title: "Stocks", html: '<div class="command-result stocks-result"><div class="stocks-card stocks-card--inline"><div class="stocks-kicker">Stock</div><div class="stocks-sub">Try <code>!stock aapl</code>. Needs a Finnhub API key in the Stocks plugin settings.</div></div></div>' };
-    return { title: "", html: slot.template.replace(/\{\{content\}\}/g, () => html) };
-  },
-};

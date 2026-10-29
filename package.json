@@ -24,23 +24,23 @@
       "path": "plugins/calculator",
       "name": "Calculator",
       "description": "Calculator and unit converter card: arithmetic with exact big integers, percentages, functions, number bases and common units. Runs on your server, no upstream. Inline (detailed, above the results) or panel (compact, side column). Replaces the official math plugin.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "type": "slot",
       "minDegoogVersion": "1.1.0"
     },
     {
       "path": "plugins/currency",
       "name": "Currency converter",
-      "description": "Currency conversion card: fiat rates from open.er-api.com (one cached request a day, cross rates computed locally) and crypto prices from Coinbase's public API, with 24 h change and range. Inline (detailed) or panel (compact). No keys.",
-      "version": "1.0.0",
+      "description": "Currency conversion card (usd to euro, 1 usd to pound, 5 quid in dollars, usd eur, 20 bucks to yen): fiat rates from open.er-api.com (one cached request a day, cross rates computed locally) and crypto prices from Coinbase's public API, with 24 h change and range. Inline (detailed) or panel (compact). No keys.",
+      "version": "1.1.0",
       "type": "slot",
       "minDegoogVersion": "1.1.0"
     },
     {
       "path": "plugins/dictionary",
       "name": "Dictionary",
-      "description": "Dictionary card for explicit questions (define X, X meaning, synonyms of X, how to pronounce X) from the Free Dictionary API (English, Wiktionary CC BY-SA): meanings, examples, synonyms and pronunciation audio. Inline (detailed) or panel (compact). Replaces the official define plugin.",
-      "version": "1.0.0",
+      "description": "Dictionary card for define X, X meaning, synonyms of X, how to pronounce X and (optionally, on by default) a word typed on its own, from the Free Dictionary API (English, Wiktionary CC BY-SA): meanings, examples, synonyms and pronunciation audio. Inline (detailed) or panel (compact). Replaces the official define plugin.",
+      "version": "1.1.0",
       "type": "slot",
       "minDegoogVersion": "1.1.0"
     },
@@ -64,23 +64,23 @@
       "path": "plugins/stocks",
       "name": "Stocks (Finnhub)",
       "description": "Stock quote card for 'AAPL stock', '$AAPL', 'apple stock price' and (optionally) a bare ticker: price, change, market status, day and 52-week ranges, statistics, sparkline when available. Needs a free Finnhub API key (US stocks on the free plan); sent only in a header. Inline (detailed) or panel (compact).",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "type": "slot",
       "minDegoogVersion": "1.1.0"
     },
     {
       "path": "plugins/weather",
       "name": "Weather",
-      "description": "Weather card for 'weather in Paris', 'forecast', 'is it raining in Seattle': current conditions, 24-hour strip, 7-day forecast, air quality, from Open-Meteo (no key). Disambiguates 'paris texas'. Inline (detailed) or panel (compact). Replaces the official weather plugin.",
-      "version": "1.0.0",
+      "description": "Weather card for 'weather in Paris', 'forecast', 'is it raining in Seattle': current conditions, 24-hour strip, 7-day forecast, air quality, from Open-Meteo (no key). Disambiguates 'paris texas'. A bare 'weather' asks the browser to use your location (or a typed city) and remembers it in that browser. Inline (detailed) or panel (compact). Replaces the official weather plugin.",
+      "version": "1.1.0",
       "type": "slot",
       "minDegoogVersion": "1.1.0"
     },
     {
       "path": "plugins/sports",
       "name": "Sports scores (ESPN)",
-      "description": "Live score card for 'panthers score', 'did the lakers win', 'arsenal match', 'nfl scores': NFL, NBA, MLB, NHL, MLS, Premier League, WNBA and NCAA football/basketball from ESPN's public (unofficial, keyless) scoreboard. Never answers a bare team name. Inline (detailed) or panel (compact), refreshes while a game is live. Bang: !score.",
-      "version": "1.0.0",
+      "description": "Live score card for 'panthers score', 'did the lakers win', 'arsenal match', 'nfl scores': NFL, NBA, MLB, NHL, MLS, Premier League, WNBA and NCAA football/basketball from ESPN's public (unofficial, keyless) scoreboard. Never answers a bare team name. Inline (detailed) or panel (compact), refreshes while a game is live.",
+      "version": "1.1.0",
       "type": "slot",
       "minDegoogVersion": "1.1.0"
     }

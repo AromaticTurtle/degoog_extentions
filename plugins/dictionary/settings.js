@@ -35,6 +35,15 @@ export const SETTINGS_SCHEMA = [
     description: "Each one is a link to a 'define <word>' search. Searches for 'synonyms of ...' and 'antonyms of ...' always show them.",
   },
   {
+    key: "triggerOnBareWord",
+    fieldset: "Display",
+    label: "Define a word typed on its own",
+    type: "toggle",
+    default: "true",
+    description:
+      "On: a search that is just one word (colloquial, ephemeral) shows its definition above the web results. Words other plugins answer (weather, forecast, score, a ticker such as AAPL, bitcoin), popular sites (google, youtube, login...), numbers and anything with a dot or slash are skipped without a request. Off: only 'define X', 'X meaning', 'synonyms of X' and the other explicit forms trigger.",
+  },
+  {
     key: "audio",
     fieldset: "Pronunciation",
     label: "Pronunciation audio",

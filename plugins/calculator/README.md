@@ -20,8 +20,7 @@ ranges (`1-2`), sizes (`1920x1080`, `4x4`), product names (`iphone 15 pro`) and 
 an explicit prefix when a calculation looks like one of those (`100 / 4` or `calc 24/7`; a bare `24/7` is a time, not a fraction).
 
 ## Setup
-1. In degoog: Settings > Store > add this repository, then install **Calculator**. It shows up as the plugin **Calculator** and a
-   small command of the same name for the `!calc` bang.
+1. In degoog: Settings > Store > add this repository, then install **Calculator**. It shows up as one entry, **Calculator**, in Settings > Plugins.
 2. Disable the official **math** plugin. Nothing else is needed: there is no key and no upstream.
 
 ## Layout: inline or panel
@@ -68,9 +67,6 @@ The core plugins (calculator, currency, dictionary) do not fight over queries; e
 - the currency plugin never takes pure math or non-currency units;
 - the dictionary only answers with an explicit word such as `define`.
 
-## Bang command
-`!calc 15% of 80` (alias `!calculate`) renders the same card. degoog's command loader picks a module's default export over a named
-`command`, so this plugin has only named exports (`slot`, `command`), as the Reddit lens does.
 
 ## The Copy button
 `script.js` (loaded by degoog on every page) listens on the document, because slot html is injected after the page loads. On a plain
@@ -91,3 +87,6 @@ Only the query text is logged. Off by default (no overhead).
 fractions, pretty expression), `render.js` (cards), `index.js` (slot and command), `script.js` (copy button). `bun test`
 runs `tests/calculator.test.js` (engine table, a gating table of positives and negatives, units, bases, formatting, layouts,
 hostile input) and the cross-plugin routing test.
+
+## Changelog
+**Version 1.1.0:** the `!calc` bang command was removed. degoog lists a plugin's slot and its command as two separate entries in Settings > Plugins, and a plugin file cannot be both, so every plugin showed twice. The plain queries above cover everything the bang did. After updating, restart degoog (or reload extensions) so the old `calculator-command` entry disappears; settings you saved on the slot entry are kept.
